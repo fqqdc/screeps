@@ -17,7 +17,7 @@ if (!dest) {
 export default {
   input: "src/main.ts",
   output: {
-      file: "C:/Users/Emanon/AppData/Local/Screeps/scripts/127_0_0_1___21025/v3/main.js",
+      file: "dist/main.js",
     format: "cjs",
     sourcemap: true
   },

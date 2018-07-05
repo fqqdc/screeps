@@ -89,7 +89,6 @@ class IdleAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' IdleAction');
-        //memory.Task = Task.None;
     }
 }
 

@@ -1,5 +1,4 @@
 import { MemoryExt, Cache } from "helper";
-import { CreepHelper } from "helper/creep";
 
 const HARVEST_ADVANCE_TIME = 15;
 
@@ -55,7 +54,19 @@ export const SourceHelper = {
         return memory.sources[source.id].max = 9 - countWall;
     },
 
-    FindHarvestSourceFor: function (creep: Creep, counter: { [id: string]: number }): Source {
+    IsSourceEmpty: function (source: Source): boolean {
+        return source.energy == 0 && source.ticksToRegeneration > HARVEST_ADVANCE_TIME;
+    },
+
+    CalcTeamLength: function (usedRoom: number, max: number): number {
+        return (usedRoom - max) / max;
+    },
+
+    IsLongTeam: function (teamlength: number): boolean {
+        return teamlength > Math.LOG10E;
+    },
+
+    FindHarvestSourceFor: function (creep: Creep, counter: HashTable): Source {
         const posCreep = creep.pos;
         const sources = creep.room.find(FIND_SOURCES);
 
@@ -97,7 +108,7 @@ export const SourceHelper = {
                     optDist = sourceDist;
                 }
             } else if (best == null) {
-                const otherTeamLength = (count - max) / max;
+                const otherTeamLength = this.CalcTeamLength(count, max);
                 if (opt == null) {
                     opt = source;
                     optDist = posCreep.findPathTo(posSource).length;

@@ -10,8 +10,6 @@ export interface MemoryExt extends Memory {
     debug: boolean;
 }
 export interface CreepMemoryExt extends CreepMemory {
-    State: State;
-    StateTargetID: string;
     Task: Task;
     TaskTargetID: string;
     debug: boolean;
@@ -25,19 +23,22 @@ export interface SourceMemory {
 export class RoomCache {
     room: Room;
     sources: Source[];
-    creeps: Creep[];
+    creeps: Creep[];    
     spawns: StructureSpawn[];
     extensions: StructureExtension[];
     constructor(room: Room) {
         this.room = room;
         this.sources = [];
         this.creeps = [];
+        this.creepsIdleEmpty = [];
+        this.creepsIdleNotEmpty = [];
         this.spawns = [];
         this.extensions = [];
     }
 }
 
 export class GameCache {
+    [name: string]: any;
     rooms: RoomCache[];
     Room: { [name: string]: RoomCache };
     constructor() {

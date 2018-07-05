@@ -1,35 +1,232 @@
-import { Task, State } from "Constant";
+import { Task } from "Constant";
 import { CreepMemoryExt, Cache, GameCache, Message, RoomTaskResult, MemoryExt, debug, } from "helper";
 import { SourceHelper } from "helper/SourceHelper"
+import { CreepHelper } from "helper/CreepHelper"
 import { PositionHelper } from "helper/position";
 
-type Process = { (room: Room, cache: Cache): boolean };
-type Cache = { [id: string]: number };
 type TaskTarget = Source | Structure | ConstructionSite | Resource;
+type TaskProcess = { (room: Room, cache: TaskModuleCache): Boolean }
+type BaseBuilding = StructureExtension | StructureSpawn;
 
 export default class TaskModule {
-    TargetCounter: Cache = {};
+    private cache: TaskModuleCache;
 
     constructor() {
-        this.InitTargetCounter();
+        this.cache = {
+            TargetCounter: {},
+            TaskCounter: {},
+
+            CreepsIdleEmpty: [],
+            CreepsIdleNotEmpty: [],
+
+            ResourcesAmount: {},
+            DroppedResources: [],
+
+            SourcesData: {},
+            Sources: [],
+
+            BaseBuildings: [],
+            BaseBuildingsCapacity: {},
+
+            Towers: [],
+            TowersCapacitys: {},
+        };
+
+        this.InitTaskCounters();
     }
 
-    private InitTargetCounter(): void {
+    private InitTaskCounters(): void {
         for (const name in Game.creeps) {
             const creep = Game.creeps[name];
-            const memory = creep.memory as CreepMemoryExt;
+            const creepMemory = creep.memory as CreepMemoryExt;
 
-            const cache = this.TargetCounter;
+            const targetCounter = this.cache.TargetCounter;
+            const taskCounter = this.cache.TaskCounter;
 
-            if (memory.State != undefined && memory.State != State.Idle) {
-                const targetId = memory.StateTargetID;
-                if (targetId != undefined) {
-                    if (cache[targetId] == undefined) {
-                        cache[targetId] = 1;
-                    } else {
-                        cache[targetId]++;
-                    }
+            const targetId = creepMemory.TaskTargetID;
+            if (targetId != undefined) {
+                if (targetCounter[targetId] == undefined) {
+                    targetCounter[targetId] = 1;
+                } else {
+                    targetCounter[targetId] += 1;
                 }
+            }
+
+            if (creepMemory.Task == undefined) {
+                creepMemory.Task = Task.Idle;
+            }
+            const task = creepMemory.Task;
+            if (taskCounter[task] == undefined) {
+                taskCounter[task] = 1
+            } else {
+                taskCounter[task] += 1
+            }
+        }
+    }
+
+    private Check_ExistedTasks(room: Room): void {
+        //console.log('Process_ExistedTasks:' + room.name); // DEBUG
+        const roomCache = Cache.FindCache(room);
+        for (const creep of roomCache.creeps) {
+        }
+    }
+
+    private InitCreepArray(room: Room): void {
+        const roomCache = Cache.Room[room.name];
+        for (const creep of roomCache.creeps) {
+            const creepMemory = creep.memory as CreepMemoryExt;
+            if (creepMemory.Task == Task.Idle) {
+                if (_.sum(creep.carry) == 0) this.cache.CreepsIdleEmpty.push(creep);
+                else this.cache.CreepsIdleNotEmpty.push(creep);
+            }
+        }
+    }
+
+    private InitDroppedResources(room: Room) {
+        const resources = room.find(FIND_DROPPED_RESOURCES);
+        const targetCounter = this.cache.TargetCounter;
+        const resourcesCounter = this.cache.ResourcesAmount;
+        const roomCache = Cache.Room[room.name];
+
+        for (const res of resources) {
+            let amount = res.amount;
+
+            if (targetCounter[res.id] == undefined) {
+                this.cache.DroppedResources.push(res);
+                resourcesCounter[res.id] = amount;
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != res.id) continue;
+
+                const creepCarry = creep.carryCapacity - _.sum(creep.carry);
+                amount -= creepCarry;
+                if (amount <= 0) break;
+            }
+
+            if (amount > 0) {
+                this.cache.DroppedResources.push(res);
+                resourcesCounter[res.id] = amount;
+            }
+        }
+    }
+
+    private InitSources(room: Room) {
+        const roomCache = Cache.Room[room.name];
+        const targetCounter = this.cache.TargetCounter;
+        const memory = Memory as MemoryExt;
+
+        for (const source of roomCache.sources) {
+            let remainingRate = SourceHelper.CalcExpectRate(source);
+            let freeRoom = SourceHelper.CalcHarvestRoom(source);
+            const max = memory.sources[source.id].max;
+            let teamLength = (0 - freeRoom) / max;
+            let hasLongTeam = false;
+
+            if (targetCounter[source.id] == undefined) {
+                this.cache.Sources.push(source);
+                this.cache.SourcesData[source.id] = {
+                    RemainingRate: remainingRate,
+                    FreeRoom: freeRoom,
+                };
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != source.id) continue;
+
+                freeRoom -= 1;
+                teamLength = SourceHelper.CalcTeamLength(max - freeRoom, max);
+                hasLongTeam = SourceHelper.IsLongTeam(teamLength);
+                if (hasLongTeam) break;
+
+                remainingRate -= SourceHelper.CalcHarvestRate(creep, source);
+                if (remainingRate <= 0) break;
+            }
+
+            if (remainingRate > 0 && !hasLongTeam) {
+                this.cache.Sources.push(source);
+                this.cache.SourcesData[source.id] = {
+                    RemainingRate: remainingRate,
+                    FreeRoom: freeRoom,
+                };
+            }
+        }
+    }
+
+    private InitBaseBuildings(room: Room) {
+        const roomCache = Cache.Room[room.name];
+        const targetCounter = this.cache.TargetCounter;
+        const memory = Memory as MemoryExt;
+
+        let baseBuildings: BaseBuilding[] = [];
+        baseBuildings = baseBuildings.concat(roomCache.spawns);
+        baseBuildings = baseBuildings.concat(roomCache.extensions);
+
+        for (const baseBuilding of baseBuildings) {
+            let freeCapacity = baseBuilding.energyCapacity - baseBuilding.energy;
+            if (freeCapacity == 0) continue;
+
+            if (targetCounter[baseBuilding.id] == undefined) {
+                this.cache.BaseBuildings.push(baseBuilding);
+                this.cache.BaseBuildingsCapacity[baseBuilding.id] = freeCapacity;
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != baseBuilding.id) continue;
+
+                freeCapacity -= creep.carry.energy;
+                if (freeCapacity <= 0) break;
+            }
+
+            if (freeCapacity > 0) {
+                this.cache.BaseBuildings.push(baseBuilding);
+                this.cache.BaseBuildingsCapacity[baseBuilding.id] = freeCapacity;
+            }
+        }
+    }
+
+    private InitTowers(room: Room) {
+        const roomCache = Cache.Room[room.name];
+        const targetCounter = this.cache.TargetCounter;
+        const memory = Memory as MemoryExt;
+
+        const structures = room.find(FIND_MY_STRUCTURES);
+        const towers: StructureTower[] = [];
+        for (const structure of structures) {
+            switch (structure.structureType) {
+                case STRUCTURE_TOWER:
+                    towers.push(structure);
+                    break;
+            }
+        }
+
+        for (const tower of towers) {
+            let freeCapacity = tower.energyCapacity - tower.energy;
+            if (freeCapacity == 0) continue;
+
+            if (targetCounter[tower.id] == undefined) {
+                this.cache.Towers.push(tower);
+                this.cache.TowersCapacity[tower.id] = freeCapacity;
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != tower.id) continue;
+
+                freeCapacity -= creep.carry.energy;
+                if (freeCapacity <= 0) break;
+            }
+
+            if (freeCapacity > 0) {
+                this.cache.Towers.push(tower);
+                this.cache.TowersCapacity[tower.id] = freeCapacity;
             }
         }
     }
@@ -39,159 +236,250 @@ export default class TaskModule {
             const room = Game.rooms[roomName];
             if (!IsMyRoom(room)) continue;
 
-            Process_ExistedTasks(room, this.TargetCounter);
+            this.Check_ExistedTasks(room);
 
-            const roomMsg: RoomTaskResult = {
-                needMoreWorker: false,
-                room: room,
-            };
+            this.InitDroppedResources(room);
+            this.InitCreepArray(room);
+            this.InitSources(room);
 
             const seq = this.GetProcessSequence();
-            let process: Process | undefined;
+            let process: TaskProcess | undefined;
             while (process = seq.shift()) {
-                const result = process(room, this.TargetCounter);
-                if (!result) {
-                    console.log("----------- needMoreWorker ----------- ")
-                    roomMsg.needMoreWorker = true;
-                    break;
-                }
+                const result = process(room, this.cache);
             }
-            msg.roomTaskResults.push(roomMsg);
         }
     }
 
     // 调度任务队列
-    private GetProcessSequence(): Process[] {
-        let seq: Process[] = [];
-        seq.push(Process_MinimumUpgradeController);
+    private GetProcessSequence(): TaskProcess[] {
+        let seq: TaskProcess[] = [];
+        seq.push(TaskProcess_MinimumUpgradeController);
+        seq.push(TaskProcess_Pickup);
+        seq.push(TaskProcess_Harvest);
+        seq.push(TaskProcess_FillBase);
 
 
-        seq.push(Process_Pickup);
-        seq.push(Process_MinimumHarvest);
-        
-        seq.push(Process_BestHarvest);
+
         seq.push(Process_BestBuild);
         seq.push(Process_BestUpgradeController);
         return seq;
     }
 }
 
-function Process_ExistedTasks(room: Room, cache: Cache): void {
-    //console.log('Process_ExistedTasks:' + room.name); // DEBUG
-    const roomCache = Cache.FindCache(room);
+interface TaskModuleCache {
+    TaskCounter: HashTable;
+    TargetCounter: HashTable;
 
+    CreepsIdleEmpty: Creep[];
+    CreepsIdleNotEmpty: Creep[];
+
+    ResourcesAmount: HashTable;
+    DroppedResources: Resource[];
+
+    SourcesData: { [id: string]: SourceData };
+    Sources: Source[];
+
+    BaseBuildings: BaseBuilding[];
+    BaseBuildingsCapacity: HashTable;
+
+    Towers: StructureTower[];
+    TowersCapacity: HashTable;
+}
+
+interface SourceData {
+    RemainingRate: number;
+    FreeRoom: number;
+}
+
+function HasNotEmptyCreep(cache: TaskModuleCache): Boolean {
+    return cache.CreepsIdleNotEmpty.length > 0;
+}
+
+function NotUpgradeController(room: Room): Boolean {
+    const roomCache = Cache.Room[room.name];
     for (const creep of roomCache.creeps) {
-        const memory = creep.memory as CreepMemoryExt;
-        const task = BaseCreateCreepTask(creep, cache, memory.Task);
-        task.Run();
-    }
-}
-
-function Process_MinimumUpgradeController(room: Room, cache: Cache): boolean {
-    if (Memory.debug) console.log('Process_MinimumUpgradeController:' + room.name); // DEBUG
-    if (CountTaskCreep(room, Task.UpgradeController) < 1) {
-        const source = room.controller as StructureController;
-        const creep = GetClosestIdleCreep(source);
-        if (creep == null) return false;
-        else {
-            const task = CreateCreepTask(creep, cache, Task.UpgradeController, source);
-            task.Run();
-        }
-    }
-
-    return true;
-}
-
-function Process_Pickup(room: Room, cache: Cache): boolean {
-    //console.log('Process_Pickup:' + room.name); // DEBUG
-    const items = room.find(FIND_DROPPED_RESOURCES);
-    for (var res of items) {
-        if (cache[res.id] != undefined && cache[res.id] > 1)
-            continue;
-        let creep = GetClosestIdleCreep(res);
-        if (creep == null) {
-            console.log("Process_Pickup Result: " + false);
+        if ((creep.memory as CreepMemoryExt).Task == Task.UpgradeController)
             return false;
-        }
-
-        const task = CreateCreepTask(creep, cache, Task.Pickup, res);
-        task.Run();
     }
-
-    console.log("Process_Pickup Result: " + true);
     return true;
 }
 
-function Process_MinimumHarvest(room: Room, cache: Cache): boolean {
-    //console.log('Process_MinimumHarvest:' + room.name); // DEBUG
-    if (CountTaskCreep(room, Task.Harvest) < 1) {
-        const source = Cache.FindCache(room).sources[0];
-        const creep = GetClosestIdleCreep(source);
-        if (creep == null) return false;
-        else {
-            const task = CreateCreepTask(creep, cache, Task.Harvest, source);
-            task.Run();
+function GetClosestObject<T extends RoomObject>(from: RoomPosition, arr: T[]): T {
+    let best: T | undefined;
+    let bestPL: Number = Number.MAX_VALUE;
+
+    for (const obj of arr) {
+        const pathLength = from.findPathTo(obj).length;
+        if (best == undefined) {
+            best = obj;
+            bestPL = pathLength;
+        } else if (pathLength < bestPL) {
+            best = obj;
+            bestPL = pathLength;
         }
     }
+
+    return best as T;
+}
+
+function SetTask(creep: Creep, task: Task, target: TaskTarget, cache: TaskModuleCache) {
+    const creepMemory = creep.memory as CreepMemoryExt;
+    creepMemory.Task = task;
+    creepMemory.TaskTargetID = target.id;
+
+    if (cache.TargetCounter[target.id] == undefined) {
+        cache.TargetCounter[target.id] = 0
+    } else {
+        cache.TargetCounter[target.id] += 1;
+    }
+}
+
+function RemoveObject<T>(o: T, arr: T[]) {
+    for (let i = 0; i < arr.length; i++) {
+        if (o == arr[i]) {
+            arr.splice(i, 1);
+        }
+    }
+}
+
+function TaskProcess_MinimumUpgradeController(room: Room, cache: TaskModuleCache): Boolean {
+    if (Memory.debug) console.log('TaskProcess_MinimumUpgradeController:' + room.name); // DEBUG
+    const controller = room.controller as StructureController;
+
+    if (!HasNotEmptyCreep(cache)) return false;
+    if (!NotUpgradeController(room)) return true;
+
+    const creep = GetClosestObject(controller.pos, cache.CreepsIdleNotEmpty);
+    SetTask(creep, Task.Harvest, controller, cache);
+    RemoveObject(creep, cache.CreepsIdleNotEmpty);
 
     return true;
 }
 
-function Process_BestHarvest(room: Room, cache: Cache): boolean {
-    //console.log('Process_BestHarvest:' + room.name); // DEBUG
-    const roomCache = Cache.FindCache(room);
-    const memory = Memory as MemoryExt;
-    let countWorkRate = 0;
-    let expectRate = 0;
-    let hasLongTeam = false;
+function HasEmptyCreep(cache: TaskModuleCache): Boolean {
+    return cache.CreepsIdleEmpty.length > 0;
+}
 
-    //let teamLengthMsg = "";
-    for (const source of roomCache.sources) {
-        expectRate += SourceHelper.CalcExpectRate(source);
-        let sourcesMax = memory.sources[source.id].max;
-        let usedRoom = cache[source.id] == undefined ? 0 : cache[source.id];
-        let teamLength = (usedRoom - sourcesMax) / sourcesMax;
-        //teamLengthMsg = teamLengthMsg.concat(source.id + " teamLength:" + teamLength + "| ");
+function HasDroppedResource(cache: TaskModuleCache): Boolean {
+    return cache.DroppedResources.length > 0;
+}
 
-        for (const creep of roomCache.creeps) {
-            const memory = creep.memory as CreepMemoryExt;
-            if (memory.StateTargetID != source.id) continue;;
-            countWorkRate += SourceHelper.CalcHarvestRate(creep, source);
+function TaskProcess_Pickup(room: Room, cache: TaskModuleCache): Boolean {
+    if (Memory.debug) console.log('TaskProcess_Pickup:' + room.name); // DEBUG
 
-            hasLongTeam = hasLongTeam || (teamLength > Math.LOG10E);
+    if (!HasEmptyCreep(cache)) return false;
+    if (!HasDroppedResource(cache)) return true;
+
+    for (const res of cache.DroppedResources) {
+        if (cache.CreepsIdleEmpty.length == 0) return false;
+
+        do {
+            const creep = GetClosestCreep(res.pos, cache.CreepsIdleEmpty);
+            SetTask(creep, Task.Pickup, res, cache);
+            RemoveObject(creep, cache.CreepsIdleEmpty);
+
+            const creepCarry = creep.carryCapacity;
+            cache.ResourcesAmount[res.id] -= creepCarry;
+
+        } while (cache.ResourcesAmount[res.id] > 0 && cache.CreepsIdleEmpty.length > 0)
+    }
+
+    return cache.CreepsIdleEmpty.length > 0
+}
+
+function HasHarvestRoom(cache: TaskModuleCache) {
+    return cache.Sources.length > 0;
+}
+
+function TaskProcess_Harvest(room: Room, cache: TaskModuleCache): Boolean {
+    if (Memory.debug) console.log('TaskProcess_Harvest:' + room.name); // DEBUG
+
+    if (!HasEmptyCreep(cache)) return false;
+    if (!HasHarvestRoom(cache)) return true;
+
+    do {
+        const creep = cache.CreepsIdleEmpty.shift() as Creep;
+
+        //const source = SourceHelper.FindHarvestSourceFor(creep, cache.TargetCounter);
+        const source = GetClosestObject(creep.pos, cache.Sources);
+        SetTask(creep, Task.Harvest, source, cache);
+        RemoveObject(creep, cache.CreepsIdleEmpty);
+
+        const sourceData = cache.SourcesData[source.id];
+
+        sourceData.FreeRoom -= 1;
+        const memory = Memory as MemoryExt;
+        const max = memory.sources[source.id].max;
+        const teamLength = SourceHelper.CalcTeamLength(max - sourceData.FreeRoom, max);
+
+        const hasLongTeam = SourceHelper.IsLongTeam(teamLength)
+        if (!hasLongTeam) {
+            sourceData.RemainingRate -= SourceHelper.CalcHarvestRate(creep, source);
+            if (sourceData.RemainingRate > 0) {
+                continue;
+            }
         }
-    }
-    //const rateMsg = "IsBestHarvest WorkRate:" + countWorkRate.toPrecision(2) + " expectRate:" + expectRate.toPrecision(2) + " |" + (countWorkRate / expectRate).toPrecision(2);
-    //debug.dlog("rateMsg", rateMsg);
-    //debug.dlog("teamLengthMsg", teamLengthMsg);
 
+        RemoveObject(source, cache.Sources);
+        if (cache.Sources.length == 0) return true;
 
-    let result = expectRate == 0 || (countWorkRate / expectRate) > 1 || hasLongTeam;
-    let creep = GetIdleCreepInRoom(room);
+    } while (cache.CreepsIdleEmpty.length > 0);
 
-    while (!result && creep != null) {
-        const source = RequestHarvestSource(creep, cache);
-        const task = CreateCreepTask(creep, cache, Task.Harvest, source);
-        task.Run();
+    return cache.Sources.length == 0;
+}
 
-        countWorkRate += SourceHelper.CalcHarvestRate(creep, source);
-        creep = GetIdleCreepInRoom(room);
+function IsFullBase(cache: TaskModuleCache) {
+    return cache.BaseBuildings.length == 0;
+}
 
-        let sourcesMax = memory.sources[source.id].max;
-        let usedRoom = cache[source.id] == undefined ? 0 : cache[source.id];
-        let teamLength = (usedRoom - sourcesMax) / sourcesMax;
-        hasLongTeam = hasLongTeam || teamLength > Math.LOG10E;
+function TaskProcess_FillBase(room: Room, cache: TaskModuleCache): Boolean {
+    if (Memory.debug) console.log('TaskProcess_FillBase:' + room.name); // DEBUG
 
-        result = expectRate == 0 || (countWorkRate / expectRate) > 1 || hasLongTeam;
-    }
+    if (!HasNotEmptyCreep(cache)) return false;
+    if (IsFullBase(cache)) return true;
 
-    //if (!result) {
-    //    console.log("expectRate==0 " + expectRate);
-    //    console.log("(countWorkRate / expectRate > 1) " + countWorkRate / expectRate);
-    //    console.log("hasLongTeam " + hasLongTeam);
-    //}
-    console.log("Process_BestHarvest Result: " + result);
-    return result;
+    do {
+        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
+        const building = GetClosestObject(creep.pos, cache.BaseBuildings);
+        SetTask(creep, Task.Transfer, building, cache);
+        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+
+        cache.BaseBuildingsCapacity[building.id] -= creep.carry.energy;
+        if (cache.BaseBuildingsCapacity[building.id] <= 0) {
+            RemoveObject(building, cache.BaseBuildings);
+            if (cache.BaseBuildings.length == 0) break;
+        }
+
+    } while (cache.CreepsIdleNotEmpty.length > 0);
+
+    return cache.CreepsIdleNotEmpty.length > 0;
+}
+
+function HasNotFullTower(cache: TaskModuleCache): Boolean {
+    return cache.Towers.length > 0;
+}
+
+function TaskProcess_FillTower(room: Room, cache: TaskModuleCache): Boolean {
+    if (Memory.debug) console.log('TaskProcess_FillTower:' + room.name); // DEBUG
+
+    if (!HasNotEmptyCreep(cache)) return false;
+    if (!HasNotFullTower(cache)) return true;
+
+    do {
+        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
+        const tower = GetClosestObject(creep.pos, cache.Towers);
+        SetTask(creep, Task.Transfer, tower, cache);
+        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+
+        cache.TowersCapacity[tower.id] -= creep.carry.energy;
+        if (cache.TowersCapacity[tower.id] <= 0) {
+            RemoveObject(tower, cache.Towers);
+            if (cache.Towers.length == 0) break;
+        }
+
+    } while (cache.CreepsIdleNotEmpty.length > 0);
+
+    return cache.CreepsIdleNotEmpty.length > 0;
 }
 
 function Process_BestBuild(room: Room, cache: Cache): boolean {
@@ -210,7 +498,7 @@ function Process_BestBuild(room: Room, cache: Cache): boolean {
 
         creep = GetIdleCreepInRoom(room) as Creep;
     };
-    
+
     if (creep == null && CountTaskCreep(room, Task.Build) < 1) {
         console.log('Process_BestBuild Builder < 1:' + room.name + " " + false); // DEBUG
         return false;
@@ -257,80 +545,6 @@ function Process_BestUpgradeController(room: Room, cache: Cache): boolean {
     return result;
 }
 
-export abstract class BaseCreepTask {
-    protected readonly creep: Creep;
-    protected stateTargetCounter: HashTable
-
-    get State(): State {
-        return (this.creep.memory as CreepMemoryExt).State;
-    }
-
-    set State(value: State) {
-        (this.creep.memory as CreepMemoryExt).State = value;
-    }
-
-    set StateTarget(value: Source | Structure | ConstructionSite | Resource) {
-        const memory = (this.creep.memory as CreepMemoryExt);
-        const cache = this.stateTargetCounter;
-        const oldTarget = memory.StateTargetID;
-
-        if (oldTarget != undefined && cache[oldTarget] != undefined)
-            cache[oldTarget] -= 1;
-
-        if (cache[value.id] == undefined)
-            cache[value.id] = 0;
-        else cache[value.id] += 1;
-
-        (this.creep.memory as CreepMemoryExt).StateTargetID = value.id;
-    }
-
-    get StateTarget(): Source | Structure | ConstructionSite | Resource {
-        let stateTargetID = (this.creep.memory as CreepMemoryExt).StateTargetID;
-        return Game.getObjectById(stateTargetID) as Source | Structure | ConstructionSite | Resource;
-    }
-
-    get Task(): Task {
-        return (this.creep.memory as CreepMemoryExt).Task;
-    }
-
-    set Task(value: Task) {
-        (this.creep.memory as CreepMemoryExt).Task = value;
-    }
-
-    get TaskTarget(): Source | Structure | ConstructionSite | Resource {
-        let taskTargetID = (this.creep.memory as CreepMemoryExt).TaskTargetID;
-        return Game.getObjectById(taskTargetID) as Structure | Source;
-    }
-
-    set TaskTarget(value: Source | Structure | ConstructionSite | Resource) {
-        (this.creep.memory as CreepMemoryExt).TaskTargetID = value.id;
-    }
-
-    ClearTask(): void {
-        const memory = (this.creep.memory as CreepMemoryExt);
-        const cache = this.stateTargetCounter;
-        const oldTarget = memory.StateTargetID;
-        if (oldTarget != undefined && cache[oldTarget] != undefined)
-            cache[oldTarget] -= 1;
-
-        delete memory.Task;
-        delete memory.State;
-        delete memory.StateTargetID;
-        delete memory.TaskTargetID;
-    }
-
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        this.creep = creep;
-        this.stateTargetCounter = stateTargetCounter;
-    }
-
-    abstract Run(): void;
-}
-
-function GetClosestDropped(from: Creep): Resource | null {
-    throw "未实现";
-}
-
 function GetClosestIdleCreep(from: TaskTarget): Creep | null {
     const creeps: Creep[] = [];
     for (const name in Game.creeps) {
@@ -366,35 +580,14 @@ function CreateCreepTask(creep: Creep, stateTargetCounter: Cache, task: Task, ta
     return obj;
 }
 
-function BaseCreateCreepTask(creep: Creep, stateTargetCounter: Cache, task: Task) {
-    let obj: BaseCreepTask;
-    switch (task) {
-        case Task.Harvest:
-            obj = new HarvestTask(creep, stateTargetCounter);
-            break;
-        case Task.UpgradeController:
-            obj = new UpgradeControllerTask(creep, stateTargetCounter);
-            break;
-        case Task.Build:
-            obj = new BuildTask(creep, stateTargetCounter);
-            break;
-        case Task.Pickup:
-            obj = new PickupTask(creep, stateTargetCounter);
-            break;
-        case Task.None:
-        default:
-            obj = new NoneTask(creep, stateTargetCounter);
-            break;
-    }
-    return obj;
+
+
+function SetCreepTask(task: Task, target: TaskTarget) {
+
 }
 
 function IsMyRoom(room: Room) {
     return room.controller != null && room.controller.my;
-}
-
-function IsSourceEmpty(source: Source): boolean {
-    return source.energy == 0 && source.ticksToRegeneration > 15;
 }
 
 function IsTargetFull(target: AnyStructure): boolean {
@@ -408,10 +601,6 @@ function IsTargetFull(target: AnyStructure): boolean {
             return _.sum(target.store) == target.storeCapacity;
     }
     return true;
-}
-
-function IsCreepFull(creep: Creep): boolean {
-    return _.sum(creep.carry) == creep.carryCapacity;
 }
 
 function IsCreepEmpty(creep: Creep): boolean {
@@ -463,17 +652,6 @@ function RequestHarvestSource(creep: Creep, counter: Cache): Source {
     return SourceHelper.FindHarvestSourceFor(creep, counter);
 }
 
-function CountTaskCreep(room: Room, task: Task) {
-    const cache = Cache.FindCache(room);
-    let count = 0;
-    const creeps = Game.creeps;
-    for (const creep of cache.creeps) {
-        if ((creep.memory as CreepMemoryExt).Task == task)
-            count += 1;
-    }
-    return count;
-}
-
 function GetClosestConstructionSite(creep: Creep): ConstructionSite | null {
     const structures = creep.room.find(FIND_MY_CONSTRUCTION_SITES);
     let obj = PositionHelper.GetClosestObject(creep.pos, structures);
@@ -483,253 +661,4 @@ function GetClosestConstructionSite(creep: Creep): ConstructionSite | null {
 
 function IsConstructionSite(structure: Structure): boolean {
     return structure instanceof ConstructionSite;
-}
-
-class NoneTask extends BaseCreepTask {
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        super(creep, stateTargetCounter);
-    }
-
-    Run() {
-        const memory = this.creep.memory as CreepMemoryExt;
-        if (memory.debug) console.log('PROCESS CREEP NoneTask:' + this.creep.name); // DEBUG
-
-        this.State = State.Idle;
-    }
-}
-
-class HarvestTask extends BaseCreepTask {
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        super(creep, stateTargetCounter);
-    }
-
-    Run() {
-        let memory = this.creep.memory as CreepMemoryExt;
-        let state = this.State;
-        let creep = this.creep;
-        if (memory.debug) console.log('PROCESS HarvestTask:' + creep.name); // DEBUG
-
-        switch (state) {
-            default:
-                if (memory.debug) console.log('PROCESS Harvest Task State:' + state + ' ' + creep.name);// DEBUG
-                this.State = State.Harvest;
-                this.StateTarget = this.TaskTarget;
-                break;
-            case State.Harvest:
-                if (memory.debug) console.log('STATE_HARVEST');// DEBUG
-                let source = this.TaskTarget as Source;
-                if (this.TaskTarget == null)
-                    console.log(creep.name);
-                if (IsCreepFull(creep) || IsSourceEmpty(source)) {
-                    let obj = GetClosestNotFullContainer(creep);
-                    if (obj) {
-                        this.State = State.Transfer;
-                        this.StateTarget = obj;
-                    } else {
-                        this.State = State.Idle;
-                    }
-                }
-                break;
-            case State.Transfer:
-                if (memory.debug) console.log('STATE_TRANSFER');// DEBUG
-                if (!IsCreepEmpty(creep)) {
-                    if (IsTargetFull(this.StateTarget as AnyStructure)) {
-                        const obj = GetClosestNotFullContainer(creep);
-                        if (obj) {
-                            this.StateTarget = obj;
-                        }
-                    }
-                    break;
-                }
-                this.State = State.Idle;
-                break;
-            case State.Idle:
-                if (memory.debug) console.log('STATE_IDLE');// DEBUG
-        }
-    }
-}
-
-class UpgradeControllerTask extends BaseCreepTask {
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        super(creep, stateTargetCounter);
-    }
-
-    Run() {
-        let memory = this.creep.memory as CreepMemoryExt;
-        let state = this.State;
-        let creep = this.creep;
-        let counter = this.stateTargetCounter;
-        if (memory.debug) console.log('PROCESS CREEP runUpgradeControllerTask:' + creep.name);// DEBUG
-
-        switch (state) {
-            default:
-                if (memory.debug) console.log('PROCESS UpgradeController Task State:' + state + ' ' + creep.name);// DEBUG
-                let obj = GetClosestNotEmptyContainer(creep);
-                if (obj) {
-                    this.State = State.Withdraw;
-                    this.StateTarget = obj;
-                } else {
-                    this.State = State.Harvest;
-                    let obj = RequestHarvestSource(creep, counter);
-                    this.StateTarget = obj;
-                }
-                break;
-            case State.Withdraw:
-                if (memory.debug) console.log('STATE_WITHDRAW');// DEBUG
-                if (IsCreepFull(creep)) {
-                    this.State = State.UpgradeController;
-                    this.StateTarget = this.TaskTarget;
-                } else {
-                    let obj = GetClosestNotEmptyContainer(creep);
-                    if (obj) {
-                        this.StateTarget = obj;
-                    } else {
-                        this.State = State.Harvest;
-                        let obj = RequestHarvestSource(creep, counter);
-                        this.StateTarget = obj;
-                    }
-                }
-                break;
-            case State.Harvest:
-                if (memory.debug) console.log('STATE_HARVEST');// DEBUG
-                let source = this.StateTarget as Source;
-                if (IsCreepFull(creep) || IsSourceEmpty(source)) {
-                    this.State = State.UpgradeController;
-                    this.StateTarget = this.TaskTarget;
-                }
-                break;
-            case State.UpgradeController:
-                if (memory.debug) console.log('STATE_UPGRADE_CONTROLLER');// DEBUG
-                if (IsCreepEmpty(creep)) {
-                    this.State = State.Idle;
-                }
-                break;
-            case State.Idle:
-                if (memory.debug) console.log('STATE_IDLE');// DEBUG
-        }
-    }
-}
-
-class TransferTask extends BaseCreepTask {
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        super(creep, stateTargetCounter);
-    }
-
-    Run() {
-        throw "未实现";
-    }
-}
-
-class BuildTask extends BaseCreepTask {
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        super(creep, stateTargetCounter);
-    }
-
-    Run() {
-        let memory = this.creep.memory as CreepMemoryExt;
-        let state = this.State;
-        let creep = this.creep;
-        let counter = this.stateTargetCounter;
-        if (memory.debug) console.log('PROCESS BuildTask:' + creep.name); // DEBUG
-
-        switch (state) {
-            default:
-                if (memory.debug) console.log('PROCESS BuildTask Task State:' + state + ' ' + creep.name);// DEBUG
-                let obj = GetClosestNotEmptyContainer(creep);
-                if (obj) {
-                    this.State = State.Withdraw;
-                    this.StateTarget = obj;
-                } else {
-                    this.State = State.Harvest;
-                    let obj = RequestHarvestSource(creep, counter);
-                    this.StateTarget = obj;
-                }
-                break;
-            case State.Withdraw:
-                if (memory.debug) console.log('STATE_WITHDRAW');// DEBUG
-                if (IsCreepFull(creep)) {
-                    this.State = State.Build;
-                    this.StateTarget = this.TaskTarget;
-                } else {
-                    let obj = GetClosestNotEmptyContainer(creep);
-                    if (obj) {
-                        this.StateTarget = obj;
-                    } else {
-                        this.State = State.Harvest;
-                        let obj = RequestHarvestSource(creep, counter);
-                        this.StateTarget = obj;
-                    }
-                }
-                break;
-            case State.Harvest:
-                if (memory.debug) console.log('STATE_HARVEST');// DEBUG
-                if (IsCreepFull(creep) || IsSourceEmpty(this.StateTarget as Source)) {
-                    if (this.TaskTarget && IsConstructionSite(this.TaskTarget as Structure)) {
-                        this.State = State.Build;
-                        this.StateTarget = this.TaskTarget;
-                    } else {
-                        this.State = State.Idle;
-                    }
-                }
-                break;
-            case State.Build:
-                if (memory.debug) console.log('STATE_UPGRADE_CONTROLLER');// DEBUG
-                if (IsCreepEmpty(creep) || !IsConstructionSite(this.StateTarget as Structure)) {
-                    this.State = State.Idle;
-                }
-                break;
-            case State.Idle:
-                if (memory.debug) console.log('STATE_IDLE');// DEBUG
-        }
-    }
-}
-
-class PickupTask extends BaseCreepTask {
-    constructor(creep: Creep, stateTargetCounter: Cache) {
-        super(creep, stateTargetCounter);
-    }
-
-    Run() {
-        let memory = this.creep.memory as CreepMemoryExt;
-        let state = this.State;
-        let creep = this.creep;
-        let counter = this.stateTargetCounter;
-        if (memory.debug) console.log('PROCESS PickupTask:' + creep.name); // DEBUG
-
-        switch (state) {
-            default:
-                if (memory.debug) console.log('PROCESS BuildTask Task State:' + state + ' ' + creep.name);// DEBUG
-                this.State = State.Pickup;
-                this.StateTarget = this.TaskTarget;
-                break;
-            case State.Pickup:
-                if (memory.debug) console.log('STATE_HARVEST');// DEBUG
-                let source = this.TaskTarget as Source;
-                if (IsCreepFull(creep) || (source == null)) {
-                    let obj = GetClosestNotFullContainer(creep);
-                    if (obj) {
-                        this.State = State.Transfer;
-                        this.StateTarget = obj;
-                    } else {
-                        this.State = State.Idle;
-                    }
-                }
-                break;
-            case State.Transfer:
-                if (memory.debug) console.log('STATE_TRANSFER');// DEBUG
-                if (!IsCreepEmpty(creep)) {
-                    if (IsTargetFull(this.StateTarget as AnyStructure)) {
-                        const obj = GetClosestNotFullContainer(creep);
-                        if (obj) {
-                            this.StateTarget = obj;
-                        }
-                    }
-                    break;
-                }
-                this.State = State.Idle;
-                break;
-            case State.Idle:
-                if (memory.debug) console.log('STATE_IDLE');// DEBUG
-        }
-    }
 }

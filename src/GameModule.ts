@@ -1,4 +1,4 @@
-import { CreepMemoryExt, Cache, RoomCache, MemoryExt } from "helper";
+import { CreepMemoryExt, Cache, RoomCache, MemoryExt, GameCache } from "helper";
 import { Task, Roler } from "Constant";
 import { SpawnHelper } from "helper/spawn";
 
@@ -44,6 +44,7 @@ function InitRoomMemory(room: Room, cache: RoomCache) {
 
     const creeps = room.find(FIND_MY_CREEPS)
     for (const creep of creeps) {
+        if (creep.spawning) continue;
         cache.creeps.push(creep);
     }
 
@@ -61,6 +62,7 @@ export default class GameModule {
     Run() {
         const memory = Memory as MemoryExt;
         if (memory.sources == undefined) memory.sources = {};
+
         const cache = Cache;
 
         const rooms = Game.rooms

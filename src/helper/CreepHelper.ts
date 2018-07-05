@@ -16,4 +16,8 @@ export const CreepHelper = {
         }
         return counter;
     },
+
+    IsCreepFull: function(creep: Creep): boolean {
+        return _.sum(creep.carry) == creep.carryCapacity;
+    },
 }
