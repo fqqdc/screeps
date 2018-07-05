@@ -1,7 +1,6 @@
 import { Task } from "Constant";
 import { CreepMemoryExt, Cache, GameCache, Message, RoomTaskResult, MemoryExt, debug, } from "helper";
-import { SourceHelper } from "helper/SourceHelper"
-import { CreepHelper } from "helper/CreepHelper"
+import { SourceHelper } from "helper/SourceHelper";
 import { PositionHelper } from "helper/position";
 
 type TaskTarget = Source | Structure | ConstructionSite | Resource;
@@ -29,7 +28,7 @@ export default class TaskModule {
             BaseBuildingsCapacity: {},
 
             Towers: [],
-            TowersCapacitys: {},
+            TowersCapacity: {},
         };
 
         this.InitTaskCounters();
@@ -147,7 +146,7 @@ export default class TaskModule {
                 if (remainingRate <= 0) break;
             }
 
-            if (remainingRate > 0 && !hasLongTeam) {
+            if (!hasLongTeam && remainingRate > 0) {
                 this.cache.Sources.push(source);
                 this.cache.SourcesData[source.id] = {
                     RemainingRate: remainingRate,
