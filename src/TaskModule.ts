@@ -6,6 +6,7 @@ import { PositionHelper } from "helper/position";
 type TaskTarget = Source | Structure | ConstructionSite | Resource;
 type TaskProcess = { (room: Room, cache: TaskModuleCache): Boolean }
 type BaseBuilding = StructureExtension | StructureSpawn;
+type StructureStore = StructureContainer | StructureStorage;
 
 export default class TaskModule {
     private cache: TaskModuleCache;
@@ -29,6 +30,17 @@ export default class TaskModule {
 
             Towers: [],
             TowersCapacity: {},
+
+            ConstructionSites: [],
+
+            BrokenStructures: [],
+            BrokenStructuresDamaged: {},
+
+            NotEmptyStores: [],
+            NotEmptyStoresEnergy: {},
+
+            NotFullStores: [],
+            NotFullStoresCapacity: {},
         };
 
         this.InitTaskCounters();
@@ -193,7 +205,6 @@ export default class TaskModule {
     private InitTowers(room: Room) {
         const roomCache = Cache.Room[room.name];
         const targetCounter = this.cache.TargetCounter;
-        const memory = Memory as MemoryExt;
 
         const structures = room.find(FIND_MY_STRUCTURES);
         const towers: StructureTower[] = [];
@@ -230,6 +241,109 @@ export default class TaskModule {
         }
     }
 
+    private InitConstructionSites(room: Room) {
+        this.cache.ConstructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+    }
+
+    private InitBrokenStructures(room: Room) {
+        const targetCounter = this.cache.TargetCounter;
+        const structures = room.find(FIND_STRUCTURES)
+        const roomCache = Cache.Room[room.name];
+
+        for (const structure of structures) {
+            let damaged = structure.hitsMax - structure.hits;
+            if (damaged == 0) continue;
+
+            if (targetCounter[structure.id] == undefined) {
+                this.cache.BrokenStructures.push(structure);
+                this.cache.BrokenStructuresDamaged[structure.id] = damaged;
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != structure.id) continue;
+
+                damaged -= creep.carry.energy * 100
+                if (damaged <= 0) break;
+            }
+
+            if (damaged > 0) {
+                this.cache.BrokenStructures.push(structure);
+                this.cache.BrokenStructuresDamaged[structure.id] = damaged;
+            }
+        }
+        
+    }
+
+    private InitStores(room: Room) {
+        const targetCounter = this.cache.TargetCounter;
+        const roomCache = Cache.Room[room.name];
+
+        const structures = room.find(FIND_STRUCTURES)
+        const noFullStores: StructureStore[] = [];
+        const noEmptyStores: StructureStore[] = [];
+        for (const structure of structures) {
+            switch (structure.structureType) {
+                case STRUCTURE_STORAGE:
+                case STRUCTURE_CONTAINER:
+                    if (structure.storeCapacity - _.sum(structure.store) > 0)
+                        noFullStores.push(structure);
+                    if (structure.store.energy > 0)
+                        noEmptyStores.push(structure);
+                    break;
+            }
+        }
+
+        for (const store of noFullStores) {
+            let freeCapacity = store.storeCapacity - _.sum(store.store);
+
+            if (targetCounter[store.id] == undefined) {
+                this.cache.NotFullStores.push(store);
+                this.cache.NotFullStoresCapacity[store.id] = freeCapacity;
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != store.id) continue;
+
+                freeCapacity -= _.sum(creep.carry);
+                if (freeCapacity <= 0) break;
+            }
+
+            if (freeCapacity > 0) {
+                this.cache.NotFullStores.push(store);
+                this.cache.NotFullStoresCapacity[store.id] = freeCapacity;
+            }
+        }
+
+        for (const store of noFullStores) {
+            let energy = store.store.energy;
+
+            if (targetCounter[store.id] == undefined) {
+                this.cache.NotEmptyStores.push(store);
+                this.cache.NotEmptyStoresEnergy[store.id] = energy;
+                continue;
+            }
+
+            for (const creep of roomCache.creeps) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.TaskTargetID != store.id) continue;
+
+                energy -= creep.carryCapacity;
+                if (energy <= 0) break;
+            }
+
+            if (energy > 0) {
+                this.cache.NotEmptyStores.push(store);
+                this.cache.NotEmptyStoresEnergy[store.id] = energy;
+            }
+        }
+
+    }
+
+
     Run(msg: Message) {
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
@@ -240,6 +354,11 @@ export default class TaskModule {
             this.InitDroppedResources(room);
             this.InitCreepArray(room);
             this.InitSources(room);
+            this.InitBaseBuildings(room)
+            this.InitTowers(room);
+            this.InitConstructionSites(room);
+            this.InitBrokenStructures(room);
+            this.InitStores(room);           
 
             const seq = this.GetProcessSequence();
             let process: TaskProcess | undefined;
@@ -256,11 +375,9 @@ export default class TaskModule {
         seq.push(TaskProcess_Pickup);
         seq.push(TaskProcess_Harvest);
         seq.push(TaskProcess_FillBase);
+        seq.push(TaskProcess_FillTower);
+        seq.push(TaskProcess_WithdrawEnergy);
 
-
-
-        seq.push(Process_BestBuild);
-        seq.push(Process_BestUpgradeController);
         return seq;
     }
 }
@@ -283,6 +400,17 @@ interface TaskModuleCache {
 
     Towers: StructureTower[];
     TowersCapacity: HashTable;
+
+    ConstructionSites: ConstructionSite[];
+
+    BrokenStructures: Structure[];
+    BrokenStructuresDamaged: HashTable;
+
+    NotEmptyStores: StructureStore[];
+    NotEmptyStoresEnergy: HashTable;
+
+    NotFullStores: StructureStore[];
+    NotFullStoresCapacity: HashTable;
 }
 
 interface SourceData {
@@ -373,7 +501,7 @@ function TaskProcess_Pickup(room: Room, cache: TaskModuleCache): Boolean {
         if (cache.CreepsIdleEmpty.length == 0) return false;
 
         do {
-            const creep = GetClosestCreep(res.pos, cache.CreepsIdleEmpty);
+            const creep = GetClosestObject(res.pos, cache.CreepsIdleEmpty);
             SetTask(creep, Task.Pickup, res, cache);
             RemoveObject(creep, cache.CreepsIdleEmpty);
 
@@ -480,6 +608,44 @@ function TaskProcess_FillTower(room: Room, cache: TaskModuleCache): Boolean {
 
     return cache.CreepsIdleNotEmpty.length > 0;
 }
+
+function HasConstructionSite(cache: TaskModuleCache): Boolean {
+    return cache.ConstructionSites.length > 0;
+}
+
+function HasBrokenStructure(cache: TaskModuleCache): Boolean {
+    return cache.BrokenStructures.length > 0;
+}
+
+function HasNotEmptyStore(cache: TaskModuleCache): Boolean {
+    return cache.NotEmptyStores.length > 0;
+}
+
+function TaskProcess_WithdrawEnergy(room: Room, cache: TaskModuleCache): Boolean {
+    if (Memory.debug) console.log('TaskProcess_WithdrawEnergy:' + room.name); // DEBUG
+
+    if (!HasEmptyCreep(cache)) return false;
+    if (!HasConstructionSite(cache)) return true;
+    if (!HasBrokenStructure(cache)) return true;
+    if (!HasNotEmptyStore(cache)) return true;
+
+    do {
+        const creep = cache.CreepsIdleEmpty.shift() as Creep;
+        const store = GetClosestObject(creep.pos, cache.NotEmptyStores);
+        SetTask(creep, Task.Withdraw, store, cache);
+        RemoveObject(creep, cache.CreepsIdleEmpty);
+
+        cache.NotEmptyStoresEnergy[store.id] -= creep.carryCapacity;
+        if (cache.NotEmptyStoresEnergy[store.id] <= 0) {
+            RemoveObject(store, cache.NotEmptyStores);
+            if (cache.NotEmptyStores.length == 0) break;
+        }
+
+    } while (cache.NotEmptyStores.length > 0);
+
+    return cache.NotEmptyStores.length > 0;
+}
+
 
 function Process_BestBuild(room: Room, cache: Cache): boolean {
     //console.log('Process_BestBuild:' + room.name); // DEBUG
