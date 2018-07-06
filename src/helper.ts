@@ -14,10 +14,10 @@ export interface CreepMemoryExt extends CreepMemory {
     TaskTargetID: string;
     debug: boolean;
 }
+
 export interface SourceMemory {
     max: number;
 }
-
 
 
 export class RoomCache {
@@ -26,33 +26,107 @@ export class RoomCache {
     creeps: Creep[];    
     spawns: StructureSpawn[];
     extensions: StructureExtension[];
+
+    Data: RoomData;
+
     constructor(room: Room) {
         this.room = room;
         this.sources = [];
         this.creeps = [];
-        this.creepsIdleEmpty = [];
-        this.creepsIdleNotEmpty = [];
         this.spawns = [];
         this.extensions = [];
+
+        this.Data = {
+            TargetCounter: {},
+            TaskCounter: {},
+
+            CreepsIdleEmpty: [],
+            CreepsIdleNotEmpty: [],
+
+            ResourcesAmount: {},
+            DroppedResources: [],
+
+            SourcesData: {},
+            Sources: [],
+
+            BaseBuildings: [],
+            BaseBuildingsCapacity: {},
+
+            Towers: [],
+            TowersCapacity: {},
+
+            ConstructionSites: [],
+
+            BrokenStructures: [],
+            BrokenStructuresDamaged: {},
+
+            NotEmptyStores: [],
+            NotEmptyStoresEnergy: {},
+
+            NotFullStores: [],
+            NotFullStoresCapacity: {},
+        };
     }
 }
 
-export class GameCache {
+export interface RoomData {
+    TaskCounter: HashTable;
+    TargetCounter: HashTable;
+
+    CreepsIdleEmpty: Creep[];
+    CreepsIdleNotEmpty: Creep[];
+
+    ResourcesAmount: HashTable;
+    DroppedResources: Resource[];
+
+    SourcesData: { [id: string]: SourceData };
+    Sources: Source[];
+
+    BaseBuildings: StructureSpawnRelated[];
+    BaseBuildingsCapacity: HashTable;
+
+    Towers: StructureTower[];
+    TowersCapacity: HashTable;
+
+    ConstructionSites: ConstructionSite[];
+
+    BrokenStructures: Structure[];
+    BrokenStructuresDamaged: HashTable;
+
+    NotEmptyStores: StructureStorehouse[];
+    NotEmptyStoresEnergy: HashTable;
+
+    NotFullStores: StructureStorehouse[];
+    NotFullStoresCapacity: HashTable;
+}
+
+export interface SourceData {
+    RemainingRate: number;
+    FreeRoom: number;
+}
+
+export class _GameCache {
     [name: string]: any;
     rooms: RoomCache[];
     Room: { [name: string]: RoomCache };
+
     constructor() {
         this.rooms = [];
         this.Room = {};
     }
 
     FindCache(room: Room): RoomCache {
-        let index = _.findIndex(Cache.rooms, c => c.room == room);
-        return Cache.rooms[index];
+        let index = _.findIndex(GameCache.rooms, c => c.room == room);
+        return GameCache.rooms[index];
     }
 }
 
-export let Cache = new GameCache();
+export class _CacheConfig{
+    Initialized:Boolean = false;
+}
+
+export let CacheConfig = new _CacheConfig();
+export let GameCache = new _GameCache();
 
 export interface Message {
     roomTaskResults: RoomTaskResult[];

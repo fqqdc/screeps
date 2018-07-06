@@ -1,4 +1,4 @@
-import { MemoryExt, Cache } from "helper";
+import { MemoryExt, GameCache } from "helper";
 
 const HARVEST_ADVANCE_TIME = 15;
 
@@ -30,7 +30,7 @@ export const SourceHelper = {
     },
 
     CalcRoomExpectRate(room: Room): Number {
-        const cache = Cache.FindCache(room);
+        const cache = GameCache.FindCache(room);
         let sum = 0;
         for (const source of cache.sources) {
             sum += this.CalcExpectRate(source);

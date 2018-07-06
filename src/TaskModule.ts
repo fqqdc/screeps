@@ -1,61 +1,27 @@
 import { Task } from "Constant";
-import { CreepMemoryExt, Cache, GameCache, Message, RoomTaskResult, MemoryExt, debug, } from "helper";
+import { CreepMemoryExt, GameCache, GameCache, Message, RoomTaskResult, MemoryExt, debug, RoomData, } from "helper";
 import { SourceHelper } from "helper/SourceHelper";
-import { PositionHelper } from "helper/position";
+import { PositionHelper } from "helper/PositionHelper";
 import { CreepHelper } from "helper/CreepHelper";
 import { SiteHelper } from "helper/SiteHelper";
 import { StructureHelper } from "helper/StructureHelper";
 
-type TaskTarget = Source | Structure | ConstructionSite | Resource | StructureStore;
-type TaskProcess = { (room: Room, cache: TaskModuleCache): Boolean }
-type BaseBuilding = StructureExtension | StructureSpawn;
-type StructureStore = StructureContainer | StructureStorage;
+type TaskTarget = Source | Structure | ConstructionSite | Resource | StructureStorehouse;
+type TaskProcess = { (room: Room): Boolean }
+
 
 export default class TaskModule {
-    private cache: TaskModuleCache;
-
     constructor() {
-        this.cache = {
-            TargetCounter: {},
-            TaskCounter: {},
-
-            CreepsIdleEmpty: [],
-            CreepsIdleNotEmpty: [],
-
-            ResourcesAmount: {},
-            DroppedResources: [],
-
-            SourcesData: {},
-            Sources: [],
-
-            BaseBuildings: [],
-            BaseBuildingsCapacity: {},
-
-            Towers: [],
-            TowersCapacity: {},
-
-            ConstructionSites: [],
-
-            BrokenStructures: [],
-            BrokenStructuresDamaged: {},
-
-            NotEmptyStores: [],
-            NotEmptyStoresEnergy: {},
-
-            NotFullStores: [],
-            NotFullStoresCapacity: {},
-        };
-
-        this.InitTaskCounters();
     }
 
-    private InitTaskCounters(): void {
-        for (const name in Game.creeps) {
-            const creep = Game.creeps[name];
-            const creepMemory = creep.memory as CreepMemoryExt;
+    private InitTaskCounters(room: Room): void {
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        const targetCounter = cacheData.TargetCounter;
+        const taskCounter = cacheData.TaskCounter;
 
-            const targetCounter = this.cache.TargetCounter;
-            const taskCounter = this.cache.TaskCounter;
+        for (const creep of roomCache.creeps) {
+            const creepMemory = creep.memory as CreepMemoryExt;
 
             const targetId = creepMemory.TaskTargetID;
             if (targetId != undefined) {
@@ -78,53 +44,31 @@ export default class TaskModule {
         }
     }
 
-    private Check_ExistedTasks(room: Room): void {
-        //console.log('Process_ExistedTasks:' + room.name); // DEBUG
-        const roomCache = Cache.FindCache(room);
-
-        for (const creep of roomCache.creeps) {
-            const creepMemory = creep.memory as CreepMemoryExt;
-            switch (creepMemory.Task) {
-                case Task.Build:
-                    Check_BuildTask(creep, this.cache); break;
-                case Task.Harvest:
-                    Check_HarvestTask(creep, this.cache); break;
-                case Task.Pickup:
-                    Check_PickupTask(creep, this.cache); break;
-                case Task.Repair:
-                    Check_RepairTask(creep, this.cache); break;
-                case Task.Transfer:
-                    Check_TransferTask(creep, this.cache); break;
-                case Task.UpgradeController:
-                    Check_UpgradeControllerTask(creep, this.cache); break;
-                case Task.Withdraw:
-                    Check_WithdrawTask(creep, this.cache); break;
-            }
-        }
-    }
-
     private InitCreepArray(room: Room): void {
-        const roomCache = Cache.Room[room.name];
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
         for (const creep of roomCache.creeps) {
             const creepMemory = creep.memory as CreepMemoryExt;
             if (creepMemory.Task == Task.Idle) {
-                if (_.sum(creep.carry) == 0) this.cache.CreepsIdleEmpty.push(creep);
-                else this.cache.CreepsIdleNotEmpty.push(creep);
+                if (_.sum(creep.carry) == 0) cacheData.CreepsIdleEmpty.push(creep);
+                else cacheData.CreepsIdleNotEmpty.push(creep);
             }
         }
     }
 
     private InitDroppedResources(room: Room) {
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
         const resources = room.find(FIND_DROPPED_RESOURCES);
-        const targetCounter = this.cache.TargetCounter;
-        const resourcesCounter = this.cache.ResourcesAmount;
-        const roomCache = Cache.Room[room.name];
+        const targetCounter = cacheData.TargetCounter;
+        const resourcesCounter = cacheData.ResourcesAmount;
+
 
         for (const res of resources) {
             let amount = res.amount;
 
             if (targetCounter[res.id] == undefined) {
-                this.cache.DroppedResources.push(res);
+                cacheData.DroppedResources.push(res);
                 resourcesCounter[res.id] = amount;
                 continue;
             }
@@ -139,15 +83,16 @@ export default class TaskModule {
             }
 
             if (amount > 0) {
-                this.cache.DroppedResources.push(res);
+                cacheData.DroppedResources.push(res);
                 resourcesCounter[res.id] = amount;
             }
         }
     }
 
     private InitSources(room: Room) {
-        const roomCache = Cache.Room[room.name];
-        const targetCounter = this.cache.TargetCounter;
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        const targetCounter = cacheData.TargetCounter;
         const memory = Memory as MemoryExt;
 
         for (const source of roomCache.sources) {
@@ -158,8 +103,8 @@ export default class TaskModule {
             let hasLongTeam = false;
 
             if (targetCounter[source.id] == undefined) {
-                this.cache.Sources.push(source);
-                this.cache.SourcesData[source.id] = {
+                cacheData.Sources.push(source);
+                cacheData.SourcesData[source.id] = {
                     RemainingRate: remainingRate,
                     FreeRoom: freeRoom,
                 };
@@ -180,8 +125,8 @@ export default class TaskModule {
             }
 
             if (!hasLongTeam && remainingRate > 0) {
-                this.cache.Sources.push(source);
-                this.cache.SourcesData[source.id] = {
+                cacheData.Sources.push(source);
+                cacheData.SourcesData[source.id] = {
                     RemainingRate: remainingRate,
                     FreeRoom: freeRoom,
                 };
@@ -190,11 +135,12 @@ export default class TaskModule {
     }
 
     private InitBaseBuildings(room: Room) {
-        const roomCache = Cache.Room[room.name];
-        const targetCounter = this.cache.TargetCounter;
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        const targetCounter = cacheData.TargetCounter;
         const memory = Memory as MemoryExt;
 
-        let baseBuildings: BaseBuilding[] = [];
+        let baseBuildings: StructureSpawnRelated[] = [];
         baseBuildings = baseBuildings.concat(roomCache.spawns);
         baseBuildings = baseBuildings.concat(roomCache.extensions);
 
@@ -203,8 +149,8 @@ export default class TaskModule {
             if (freeCapacity == 0) continue;
 
             if (targetCounter[baseBuilding.id] == undefined) {
-                this.cache.BaseBuildings.push(baseBuilding);
-                this.cache.BaseBuildingsCapacity[baseBuilding.id] = freeCapacity;
+                cacheData.BaseBuildings.push(baseBuilding);
+                cacheData.BaseBuildingsCapacity[baseBuilding.id] = freeCapacity;
                 continue;
             }
 
@@ -217,15 +163,16 @@ export default class TaskModule {
             }
 
             if (freeCapacity > 0) {
-                this.cache.BaseBuildings.push(baseBuilding);
-                this.cache.BaseBuildingsCapacity[baseBuilding.id] = freeCapacity;
+                cacheData.BaseBuildings.push(baseBuilding);
+                cacheData.BaseBuildingsCapacity[baseBuilding.id] = freeCapacity;
             }
         }
     }
 
     private InitTowers(room: Room) {
-        const roomCache = Cache.Room[room.name];
-        const targetCounter = this.cache.TargetCounter;
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        const targetCounter = cacheData.TargetCounter;
 
         const structures = room.find(FIND_MY_STRUCTURES);
         const towers: StructureTower[] = [];
@@ -242,8 +189,8 @@ export default class TaskModule {
             if (freeCapacity == 0) continue;
 
             if (targetCounter[tower.id] == undefined) {
-                this.cache.Towers.push(tower);
-                this.cache.TowersCapacity[tower.id] = freeCapacity;
+                cacheData.Towers.push(tower);
+                cacheData.TowersCapacity[tower.id] = freeCapacity;
                 continue;
             }
 
@@ -256,28 +203,31 @@ export default class TaskModule {
             }
 
             if (freeCapacity > 0) {
-                this.cache.Towers.push(tower);
-                this.cache.TowersCapacity[tower.id] = freeCapacity;
+                cacheData.Towers.push(tower);
+                cacheData.TowersCapacity[tower.id] = freeCapacity;
             }
         }
     }
 
     private InitConstructionSites(room: Room) {
-        this.cache.ConstructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        cacheData.ConstructionSites = room.find(FIND_MY_CONSTRUCTION_SITES);
     }
 
     private InitBrokenStructures(room: Room) {
-        const targetCounter = this.cache.TargetCounter;
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        const targetCounter = cacheData.TargetCounter;
         const structures = room.find(FIND_STRUCTURES)
-        const roomCache = Cache.Room[room.name];
 
         for (const structure of structures) {
             let damaged = structure.hitsMax - structure.hits;
             if (damaged == 0) continue;
 
             if (targetCounter[structure.id] == undefined) {
-                this.cache.BrokenStructures.push(structure);
-                this.cache.BrokenStructuresDamaged[structure.id] = damaged;
+                cacheData.BrokenStructures.push(structure);
+                cacheData.BrokenStructuresDamaged[structure.id] = damaged;
                 continue;
             }
 
@@ -290,20 +240,21 @@ export default class TaskModule {
             }
 
             if (damaged > 0) {
-                this.cache.BrokenStructures.push(structure);
-                this.cache.BrokenStructuresDamaged[structure.id] = damaged;
+                cacheData.BrokenStructures.push(structure);
+                cacheData.BrokenStructuresDamaged[structure.id] = damaged;
             }
         }
 
     }
 
     private InitStores(room: Room) {
-        const targetCounter = this.cache.TargetCounter;
-        const roomCache = Cache.Room[room.name];
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+        const targetCounter = cacheData.TargetCounter;
 
         const structures = room.find(FIND_STRUCTURES)
-        const noFullStores: StructureStore[] = [];
-        const noEmptyStores: StructureStore[] = [];
+        const noFullStores: StructureStorehouse[] = [];
+        const noEmptyStores: StructureStorehouse[] = [];
         for (const structure of structures) {
             switch (structure.structureType) {
                 case STRUCTURE_STORAGE:
@@ -320,8 +271,8 @@ export default class TaskModule {
             let freeCapacity = store.storeCapacity - _.sum(store.store);
 
             if (targetCounter[store.id] == undefined) {
-                this.cache.NotFullStores.push(store);
-                this.cache.NotFullStoresCapacity[store.id] = freeCapacity;
+                cacheData.NotFullStores.push(store);
+                cacheData.NotFullStoresCapacity[store.id] = freeCapacity;
                 continue;
             }
 
@@ -334,8 +285,8 @@ export default class TaskModule {
             }
 
             if (freeCapacity > 0) {
-                this.cache.NotFullStores.push(store);
-                this.cache.NotFullStoresCapacity[store.id] = freeCapacity;
+                cacheData.NotFullStores.push(store);
+                cacheData.NotFullStoresCapacity[store.id] = freeCapacity;
             }
         }
 
@@ -343,8 +294,8 @@ export default class TaskModule {
             let energy = store.store.energy;
 
             if (targetCounter[store.id] == undefined) {
-                this.cache.NotEmptyStores.push(store);
-                this.cache.NotEmptyStoresEnergy[store.id] = energy;
+                cacheData.NotEmptyStores.push(store);
+                cacheData.NotEmptyStoresEnergy[store.id] = energy;
                 continue;
             }
 
@@ -357,19 +308,43 @@ export default class TaskModule {
             }
 
             if (energy > 0) {
-                this.cache.NotEmptyStores.push(store);
-                this.cache.NotEmptyStoresEnergy[store.id] = energy;
+                cacheData.NotEmptyStores.push(store);
+                cacheData.NotEmptyStoresEnergy[store.id] = energy;
             }
         }
 
+    }
+
+    private Check_ExistedTasks(room: Room): void {
+        //console.log('Process_ExistedTasks:' + room.name); // DEBUG
+        const roomCache = GameCache.Room[room.name];
+        const cacheData = roomCache.Data;
+
+        for (const creep of roomCache.creeps) {
+            const creepMemory = creep.memory as CreepMemoryExt;
+            switch (creepMemory.Task) {
+                case Task.Build:
+                    Check_BuildTask(creep, cacheData); break;
+                case Task.Harvest:
+                    Check_HarvestTask(creep, cacheData); break;
+                case Task.Pickup:
+                    Check_PickupTask(creep, cacheData); break;
+                case Task.Repair:
+                    Check_RepairTask(creep, cacheData); break;
+                case Task.Transfer:
+                    Check_TransferTask(creep, cacheData); break;
+                case Task.UpgradeController:
+                    Check_UpgradeControllerTask(creep, cacheData); break;
+                case Task.Withdraw:
+                    Check_WithdrawTask(creep, cacheData); break;
+            }
+        }
     }
 
     Run(msg: Message) {
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
             if (room.controller == null || !room.controller.my) continue;
-
-            this.Check_ExistedTasks(room);
 
             this.InitDroppedResources(room);
             this.InitCreepArray(room);
@@ -380,10 +355,12 @@ export default class TaskModule {
             this.InitBrokenStructures(room);
             this.InitStores(room);
 
+            this.Check_ExistedTasks(room);
+
             const seq = this.GetProcessSequence();
             let process: TaskProcess | undefined;
             while (process = seq.shift()) {
-                const result = process(room, this.cache);
+                const result = process(room);
             }
         }
     }
@@ -406,48 +383,14 @@ export default class TaskModule {
     }
 }
 
-interface TaskModuleCache {
-    TaskCounter: HashTable;
-    TargetCounter: HashTable;
 
-    CreepsIdleEmpty: Creep[];
-    CreepsIdleNotEmpty: Creep[];
 
-    ResourcesAmount: HashTable;
-    DroppedResources: Resource[];
-
-    SourcesData: { [id: string]: SourceData };
-    Sources: Source[];
-
-    BaseBuildings: BaseBuilding[];
-    BaseBuildingsCapacity: HashTable;
-
-    Towers: StructureTower[];
-    TowersCapacity: HashTable;
-
-    ConstructionSites: ConstructionSite[];
-
-    BrokenStructures: Structure[];
-    BrokenStructuresDamaged: HashTable;
-
-    NotEmptyStores: StructureStore[];
-    NotEmptyStoresEnergy: HashTable;
-
-    NotFullStores: StructureStore[];
-    NotFullStoresCapacity: HashTable;
-}
-
-interface SourceData {
-    RemainingRate: number;
-    FreeRoom: number;
-}
-
-function HasNotEmptyCreep(cache: TaskModuleCache): Boolean {
+function HasNotEmptyCreep(cache: RoomData): Boolean {
     return cache.CreepsIdleNotEmpty.length > 0;
 }
 
 function NotUpgradeController(room: Room): Boolean {
-    const roomCache = Cache.Room[room.name];
+    const roomCache = GameCache.Room[room.name];
     for (const creep of roomCache.creeps) {
         if ((creep.memory as CreepMemoryExt).Task == Task.UpgradeController)
             return false;
@@ -473,7 +416,7 @@ function GetClosestObject<T extends RoomObject>(from: RoomPosition, arr: T[]): T
     return best as T;
 }
 
-function SetTask(creep: Creep, task: Task, target: TaskTarget, cache: TaskModuleCache) {
+function SetTask(creep: Creep, task: Task, target: TaskTarget, cache: RoomData) {
     if (task == Task.Idle) throw "不能设置 Task.Idle 任务";
     const creepMemory = creep.memory as CreepMemoryExt;
 
@@ -492,7 +435,7 @@ function SetTask(creep: Creep, task: Task, target: TaskTarget, cache: TaskModule
     }
 }
 
-function SetIdleTask(creep: Creep, cache: TaskModuleCache) {
+function SetIdleTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const oldTargetID = creepMemory.TaskTargetID;
     if (cache.TargetCounter[oldTargetID] == undefined
@@ -511,70 +454,77 @@ function RemoveObject<T>(o: T, arr: T[]) {
     }
 }
 
-function TaskProcess_MinimumUpgradeController(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_MinimumUpgradeController:' + room.name); // DEBUG
 
-    if (!HasNotEmptyCreep(cache)) return false;
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
+
+    if (!HasNotEmptyCreep(cacheData)) return false;
     if (!NotUpgradeController(room)) return true;
 
     const controller = room.controller as StructureController;
-    const creep = GetClosestObject(controller.pos, cache.CreepsIdleNotEmpty);
-    SetTask(creep, Task.Harvest, controller, cache);
-    RemoveObject(creep, cache.CreepsIdleNotEmpty);
+    const creep = GetClosestObject(controller.pos, cacheData.CreepsIdleNotEmpty);
+    SetTask(creep, Task.Harvest, controller, cacheData);
+    RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
     return true;
 }
 
-function HasEmptyCreep(cache: TaskModuleCache): Boolean {
+function HasEmptyCreep(cache: RoomData): Boolean {
     return cache.CreepsIdleEmpty.length > 0;
 }
 
-function HasDroppedResource(cache: TaskModuleCache): Boolean {
+function HasDroppedResource(cache: RoomData): Boolean {
     return cache.DroppedResources.length > 0;
 }
 
-function TaskProcess_Pickup(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_Pickup(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Pickup:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasEmptyCreep(cache)) return false;
-    if (!HasDroppedResource(cache)) return true;
+    if (!HasEmptyCreep(cacheData)) return false;
+    if (!HasDroppedResource(cacheData)) return true;
 
-    for (const res of cache.DroppedResources) {
-        if (cache.CreepsIdleEmpty.length == 0) return false;
+    for (const res of cacheData.DroppedResources) {
+        if (cacheData.CreepsIdleEmpty.length == 0) return false;
 
         do {
-            const creep = GetClosestObject(res.pos, cache.CreepsIdleEmpty);
-            SetTask(creep, Task.Pickup, res, cache);
-            RemoveObject(creep, cache.CreepsIdleEmpty);
+            const creep = GetClosestObject(res.pos, cacheData.CreepsIdleEmpty);
+            SetTask(creep, Task.Pickup, res, cacheData);
+            RemoveObject(creep, cacheData.CreepsIdleEmpty);
 
             const creepCarry = creep.carryCapacity;
-            cache.ResourcesAmount[res.id] -= creepCarry;
+            cacheData.ResourcesAmount[res.id] -= creepCarry;
 
-        } while (cache.ResourcesAmount[res.id] > 0 && cache.CreepsIdleEmpty.length > 0)
+        } while (cacheData.ResourcesAmount[res.id] > 0 && cacheData.CreepsIdleEmpty.length > 0)
     }
 
-    return cache.CreepsIdleEmpty.length > 0
+    return cacheData.CreepsIdleEmpty.length > 0
 }
 
-function HasHarvestRoom(cache: TaskModuleCache) {
+function HasHarvestRoom(cache: RoomData) {
     return cache.Sources.length > 0;
 }
 
-function TaskProcess_Harvest(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_Harvest(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Harvest:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasEmptyCreep(cache)) return false;
-    if (!HasHarvestRoom(cache)) return true;
+    if (!HasEmptyCreep(cacheData)) return false;
+    if (!HasHarvestRoom(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleEmpty.shift() as Creep;
+        const creep = cacheData.CreepsIdleEmpty.shift() as Creep;
 
         //const source = SourceHelper.FindHarvestSourceFor(creep, cache.TargetCounter);
-        const source = GetClosestObject(creep.pos, cache.Sources);
-        SetTask(creep, Task.Harvest, source, cache);
-        RemoveObject(creep, cache.CreepsIdleEmpty);
+        const source = GetClosestObject(creep.pos, cacheData.Sources);
+        SetTask(creep, Task.Harvest, source, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleEmpty);
 
-        const sourceData = cache.SourcesData[source.id];
+        const sourceData = cacheData.SourcesData[source.id];
 
         sourceData.FreeRoom -= 1;
         const memory = Memory as MemoryExt;
@@ -589,185 +539,199 @@ function TaskProcess_Harvest(room: Room, cache: TaskModuleCache): Boolean {
             }
         }
 
-        RemoveObject(source, cache.Sources);
-        if (cache.Sources.length == 0) return true;
+        RemoveObject(source, cacheData.Sources);
+        if (cacheData.Sources.length == 0) return true;
 
-    } while (cache.CreepsIdleEmpty.length > 0);
+    } while (cacheData.CreepsIdleEmpty.length > 0);
 
-    return cache.Sources.length == 0;
+    return cacheData.Sources.length == 0;
 }
 
-function IsFullBase(cache: TaskModuleCache) {
+function IsFullBase(cache: RoomData) {
     return cache.BaseBuildings.length == 0;
 }
 
-function TaskProcess_FillBase(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_FillBase(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_FillBase:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasNotEmptyCreep(cache)) return false;
-    if (IsFullBase(cache)) return true;
+    if (!HasNotEmptyCreep(cacheData)) return false;
+    if (IsFullBase(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
-        const building = GetClosestObject(creep.pos, cache.BaseBuildings);
-        SetTask(creep, Task.Transfer, building, cache);
-        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+        const creep = cacheData.CreepsIdleNotEmpty.shift() as Creep;
+        const building = GetClosestObject(creep.pos, cacheData.BaseBuildings);
+        SetTask(creep, Task.Transfer, building, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
-        cache.BaseBuildingsCapacity[building.id] -= creep.carry.energy;
-        if (cache.BaseBuildingsCapacity[building.id] <= 0) {
-            RemoveObject(building, cache.BaseBuildings);
-            if (cache.BaseBuildings.length == 0) break;
+        cacheData.BaseBuildingsCapacity[building.id] -= creep.carry.energy;
+        if (cacheData.BaseBuildingsCapacity[building.id] <= 0) {
+            RemoveObject(building, cacheData.BaseBuildings);
+            if (cacheData.BaseBuildings.length == 0) break;
         }
 
-    } while (cache.CreepsIdleNotEmpty.length > 0);
+    } while (cacheData.CreepsIdleNotEmpty.length > 0);
 
-    return cache.CreepsIdleNotEmpty.length > 0;
+    return cacheData.CreepsIdleNotEmpty.length > 0;
 }
 
-function HasNotFullTower(cache: TaskModuleCache): Boolean {
+function HasNotFullTower(cache: RoomData): Boolean {
     return cache.Towers.length > 0;
 }
 
-function TaskProcess_FillTower(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_FillTower(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_FillTower:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasNotEmptyCreep(cache)) return false;
-    if (!HasNotFullTower(cache)) return true;
+    if (!HasNotEmptyCreep(cacheData)) return false;
+    if (!HasNotFullTower(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
-        const tower = GetClosestObject(creep.pos, cache.Towers);
-        SetTask(creep, Task.Transfer, tower, cache);
-        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+        const creep = cacheData.CreepsIdleNotEmpty.shift() as Creep;
+        const tower = GetClosestObject(creep.pos, cacheData.Towers);
+        SetTask(creep, Task.Transfer, tower, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
-        cache.TowersCapacity[tower.id] -= creep.carry.energy;
-        if (cache.TowersCapacity[tower.id] <= 0) {
-            RemoveObject(tower, cache.Towers);
-            if (cache.Towers.length == 0) break;
+        cacheData.TowersCapacity[tower.id] -= creep.carry.energy;
+        if (cacheData.TowersCapacity[tower.id] <= 0) {
+            RemoveObject(tower, cacheData.Towers);
+            if (cacheData.Towers.length == 0) break;
         }
 
-    } while (cache.CreepsIdleNotEmpty.length > 0);
+    } while (cacheData.CreepsIdleNotEmpty.length > 0);
 
-    return cache.CreepsIdleNotEmpty.length > 0;
+    return cacheData.CreepsIdleNotEmpty.length > 0;
 }
 
-function HasConstructionSite(cache: TaskModuleCache): Boolean {
+function HasConstructionSite(cache: RoomData): Boolean {
     return cache.ConstructionSites.length > 0;
 }
 
-function HasBrokenStructure(cache: TaskModuleCache): Boolean {
+function HasBrokenStructure(cache: RoomData): Boolean {
     return cache.BrokenStructures.length > 0;
 }
 
-function TaskProcess_WithdrawEnergy(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_WithdrawEnergy(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_WithdrawEnergy:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasEmptyCreep(cache)) return false;
-    if (!HasConstructionSite(cache)) return true;
-    if (!HasBrokenStructure(cache)) return true;
-    if (!HasNotEmptyStore(cache)) return true;
+    if (!HasEmptyCreep(cacheData)) return false;
+    if (!HasConstructionSite(cacheData)) return true;
+    if (!HasBrokenStructure(cacheData)) return true;
+    if (!HasNotEmptyStore(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleEmpty.shift() as Creep;
-        const store = GetClosestObject(creep.pos, cache.NotEmptyStores);
-        SetTask(creep, Task.Withdraw, store, cache);
-        RemoveObject(creep, cache.CreepsIdleEmpty);
+        const creep = cacheData.CreepsIdleEmpty.shift() as Creep;
+        const store = GetClosestObject(creep.pos, cacheData.NotEmptyStores);
+        SetTask(creep, Task.Withdraw, store, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleEmpty);
 
-        cache.NotEmptyStoresEnergy[store.id] -= creep.carryCapacity;
-        if (cache.NotEmptyStoresEnergy[store.id] <= 0) {
-            RemoveObject(store, cache.NotEmptyStores);
-            if (cache.NotEmptyStores.length == 0) break;
+        cacheData.NotEmptyStoresEnergy[store.id] -= creep.carryCapacity;
+        if (cacheData.NotEmptyStoresEnergy[store.id] <= 0) {
+            RemoveObject(store, cacheData.NotEmptyStores);
+            if (cacheData.NotEmptyStores.length == 0) break;
         }
 
-    } while (cache.NotEmptyStores.length > 0);
+    } while (cacheData.NotEmptyStores.length > 0);
 
-    return cache.NotEmptyStores.length > 0;
+    return cacheData.NotEmptyStores.length > 0;
 }
 
-function TaskProcess_Build(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_Build(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Build:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasNotEmptyCreep(cache)) return false;
-    if (!HasConstructionSite(cache)) return true;
+    if (!HasNotEmptyCreep(cacheData)) return false;
+    if (!HasConstructionSite(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
-        const site = GetClosestObject(creep.pos, cache.ConstructionSites);
-        SetTask(creep, Task.Build, site, cache);
-        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+        const creep = cacheData.CreepsIdleNotEmpty.shift() as Creep;
+        const site = GetClosestObject(creep.pos, cacheData.ConstructionSites);
+        SetTask(creep, Task.Build, site, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
-    } while (cache.CreepsIdleNotEmpty.length > 0)
+    } while (cacheData.CreepsIdleNotEmpty.length > 0)
 
-    return cache.CreepsIdleNotEmpty.length > 0;
+    return cacheData.CreepsIdleNotEmpty.length > 0;
 }
 
-function TaskProcess_Repair(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_Repair(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Repair:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasNotEmptyCreep(cache)) return false;
-    if (!HasBrokenStructure(cache)) return true;
+    if (!HasNotEmptyCreep(cacheData)) return false;
+    if (!HasBrokenStructure(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
-        const broken = GetClosestObject(creep.pos, cache.BrokenStructures);
-        SetTask(creep, Task.Repair, broken, cache);
-        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+        const creep = cacheData.CreepsIdleNotEmpty.shift() as Creep;
+        const broken = GetClosestObject(creep.pos, cacheData.BrokenStructures);
+        SetTask(creep, Task.Repair, broken, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
-        cache.BrokenStructuresDamaged[broken.id] -= creep.carry.energy * 100;
-        if (cache.NotEmptyStoresEnergy[broken.id] <= 0) {
-            RemoveObject(broken, cache.BrokenStructures);
-            if (cache.BrokenStructures.length == 0) break;
+        cacheData.BrokenStructuresDamaged[broken.id] -= creep.carry.energy * 100;
+        if (cacheData.NotEmptyStoresEnergy[broken.id] <= 0) {
+            RemoveObject(broken, cacheData.BrokenStructures);
+            if (cacheData.BrokenStructures.length == 0) break;
         }
 
-    } while (cache.CreepsIdleNotEmpty.length > 0)
+    } while (cacheData.CreepsIdleNotEmpty.length > 0)
 
-    return cache.CreepsIdleNotEmpty.length > 0;
+    return cacheData.CreepsIdleNotEmpty.length > 0;
 }
 
-function HasNotEmptyStore(cache: TaskModuleCache): Boolean {
+function HasNotEmptyStore(cache: RoomData): Boolean {
     return cache.NotEmptyStores.length > 0;
 }
 
-function TaskProcess_FillStore(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_FillStore(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_FillStore:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasNotEmptyCreep(cache)) return false;
-    if (!HasNotEmptyStore(cache)) return true;
+    if (!HasNotEmptyCreep(cacheData)) return false;
+    if (!HasNotEmptyStore(cacheData)) return true;
 
     do {
-        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
-        const store = GetClosestObject(creep.pos, cache.NotEmptyStores);
-        SetTask(creep, Task.Transfer, store, cache);
-        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+        const creep = cacheData.CreepsIdleNotEmpty.shift() as Creep;
+        const store = GetClosestObject(creep.pos, cacheData.NotEmptyStores);
+        SetTask(creep, Task.Transfer, store, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
-        cache.NotEmptyStoresEnergy[store.id] -= _.sum(creep.carry);
-        if (cache.NotEmptyStoresEnergy[store.id] <= 0) {
-            RemoveObject(store, cache.NotEmptyStores);
-            if (cache.NotEmptyStores.length == 0) break;
+        cacheData.NotEmptyStoresEnergy[store.id] -= _.sum(creep.carry);
+        if (cacheData.NotEmptyStoresEnergy[store.id] <= 0) {
+            RemoveObject(store, cacheData.NotEmptyStores);
+            if (cacheData.NotEmptyStores.length == 0) break;
         }
 
-    } while (cache.CreepsIdleNotEmpty.length > 0)
+    } while (cacheData.CreepsIdleNotEmpty.length > 0)
 
-    return cache.CreepsIdleNotEmpty.length > 0;
+    return cacheData.CreepsIdleNotEmpty.length > 0;
 }
 
-function TaskProcess_UpgradeController(room: Room, cache: TaskModuleCache): Boolean {
+function TaskProcess_UpgradeController(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_UpgradeController:' + room.name); // DEBUG
+    const roomCache = GameCache.Room[room.name];
+    const cacheData = roomCache.Data;
 
-    if (!HasNotEmptyCreep(cache)) return false;
+    if (!HasNotEmptyCreep(cacheData)) return false;
 
     const controller = room.controller as StructureController;
     do {
-        const creep = cache.CreepsIdleNotEmpty.shift() as Creep;
-        SetTask(creep, Task.UpgradeController, controller, cache);
-        RemoveObject(creep, cache.CreepsIdleNotEmpty);
+        const creep = cacheData.CreepsIdleNotEmpty.shift() as Creep;
+        SetTask(creep, Task.UpgradeController, controller, cacheData);
+        RemoveObject(creep, cacheData.CreepsIdleNotEmpty);
 
-    } while (cache.CreepsIdleNotEmpty.length > 0)
+    } while (cacheData.CreepsIdleNotEmpty.length > 0)
 
     return false;
 }
 
-function Check_BuildTask(creep: Creep, cache: TaskModuleCache) {
+function Check_BuildTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const structure = Game.getObjectById(creepMemory.TaskTargetID) as Structure;
     if (structure == null
@@ -777,7 +741,7 @@ function Check_BuildTask(creep: Creep, cache: TaskModuleCache) {
     }
 }
 
-function Check_HarvestTask(creep: Creep, cache: TaskModuleCache) {
+function Check_HarvestTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const source = Game.getObjectById(creepMemory.TaskTargetID) as Source;
     if (CreepHelper.IsCreepFull(creep)
@@ -786,7 +750,7 @@ function Check_HarvestTask(creep: Creep, cache: TaskModuleCache) {
     }
 }
 
-function Check_PickupTask(creep: Creep, cache: TaskModuleCache) {
+function Check_PickupTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const resource = Game.getObjectById(creepMemory.TaskTargetID) as Resource;
 
@@ -795,7 +759,7 @@ function Check_PickupTask(creep: Creep, cache: TaskModuleCache) {
     }
 }
 
-function Check_RepairTask(creep: Creep, cache: TaskModuleCache) {
+function Check_RepairTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const structure = Game.getObjectById(creepMemory.TaskTargetID) as Structure;
 
@@ -806,7 +770,7 @@ function Check_RepairTask(creep: Creep, cache: TaskModuleCache) {
     }
 }
 
-function Check_TransferTask(creep: Creep, cache: TaskModuleCache) {
+function Check_TransferTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const structure = Game.getObjectById(creepMemory.TaskTargetID) as Structure;
 
@@ -817,7 +781,7 @@ function Check_TransferTask(creep: Creep, cache: TaskModuleCache) {
     }
 }
 
-function Check_UpgradeControllerTask(creep: Creep, cache: TaskModuleCache) {
+function Check_UpgradeControllerTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
 
     if (CreepHelper.IsCreepEmpty(creep)) {
@@ -825,7 +789,7 @@ function Check_UpgradeControllerTask(creep: Creep, cache: TaskModuleCache) {
     }
 }
 
-function Check_WithdrawTask(creep: Creep, cache: TaskModuleCache) {
+function Check_WithdrawTask(creep: Creep, cache: RoomData) {
     const creepMemory = creep.memory as CreepMemoryExt;
     const structure = Game.getObjectById(creepMemory.TaskTargetID) as Structure;
 

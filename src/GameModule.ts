@@ -1,23 +1,5 @@
-import { CreepMemoryExt, Cache, RoomCache, MemoryExt, GameCache } from "helper";
+import { CreepMemoryExt, RoomCache, MemoryExt, GameCache } from "helper";
 import { Task, Roler } from "Constant";
-import { SpawnHelper } from "helper/spawn";
-
-function HasNoneTaskCreep(room: Room) {
-    const roomCache = Cache.FindCache(room);
-    for (const creep of roomCache.creeps) {
-        if (!creep.spawning) continue;
-
-        const memory = creep.memory as CreepMemoryExt;
-        if (memory.Task == Task.None)
-            return true;
-    }
-    return false;
-}
-
-function CountCreeps(room: Room) {
-    const roomCache = Cache.FindCache(room);
-    return roomCache.creeps.length;
-}
 
 function InitRoomMemory(room: Room, cache: RoomCache) {
     const memory = Memory as MemoryExt;
@@ -63,8 +45,7 @@ export default class GameModule {
         const memory = Memory as MemoryExt;
         if (memory.sources == undefined) memory.sources = {};
 
-        const cache = Cache;
-
+        const cache = GameCache;
         const rooms = Game.rooms
         for (const n in rooms) {
             const room: Room = rooms[n];
