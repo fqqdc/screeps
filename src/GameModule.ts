@@ -1,5 +1,6 @@
 import { CreepMemoryExt, RoomCache, MemoryExt, GameCache } from "helper";
 import { Task, Roler } from "Constant";
+import WorldManager from "game/WorldManager";
 
 function InitRoomMemory(room: Room, cache: RoomCache) {
     const memory = Memory as MemoryExt;
@@ -42,14 +43,7 @@ function InitRoomMemory(room: Room, cache: RoomCache) {
 
 export default class GameModule {
     Run() {
-        const memory = Memory as MemoryExt;
-        if (memory.sources == undefined) memory.sources = {};
-
-        const cache = GameCache;
-        const rooms = Game.rooms
-        for (const n in rooms) {
-            const room: Room = rooms[n];
-        }
+        WorldManager.Entity.ScanRooms();
     }
 }
 

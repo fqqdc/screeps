@@ -27,7 +27,7 @@ export class RoomCache {
     spawns: StructureSpawn[];
     extensions: StructureExtension[];
 
-    Data: RoomData;
+    Data: _RoomData;
 
     constructor(room: Room) {
         this.room = room;
@@ -69,7 +69,7 @@ export class RoomCache {
     }
 }
 
-export interface RoomData {
+export interface _RoomData {
     TaskCounter: HashTable;
     TargetCounter: HashTable;
 
@@ -159,4 +159,14 @@ export const debug = {
             memory.debugMsg[keyName] = msg;
         }
     }
+}
+
+export function GetGameObjects<T>(ids: string[]): T[] {
+    const arr: T[] = [];
+    for (const id of ids) {
+        const obj = Game.getObjectById<T>(id);
+        if (obj != null)
+            arr.push(obj);
+    }
+    return arr;
 }

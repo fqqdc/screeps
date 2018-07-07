@@ -12,3 +12,7 @@ export enum Task {
 export enum Roler {
     Worker,
 }
+
+export enum State {
+    Unknown,
+}
