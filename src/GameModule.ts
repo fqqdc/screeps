@@ -49,12 +49,6 @@ export default class GameModule {
         const rooms = Game.rooms
         for (const n in rooms) {
             const room: Room = rooms[n];
-            const roomCache = new RoomCache(room);
-
-            cache.rooms.push(roomCache);
-            cache.Room[room.name] = roomCache;
-
-            InitRoomMemory(room, roomCache);
         }
     }
 }
