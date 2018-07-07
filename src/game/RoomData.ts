@@ -1,5 +1,7 @@
 import { MemoryExt, CreepMemoryExt, GetGameObjects } from "helper";
 import { SourceHelper } from "helper/SourceHelper";
+import { Task } from "Constant";
+import SourceData from "./SourceData";
 
 export default class RoomData {
     name: string;
@@ -11,6 +13,9 @@ export default class RoomData {
     idleNotEmptyCreeps: string[];
 
     spawns: string[];
+    extensions: string[];
+    noFullSpawnRelateds: string[];
+
     structures: string[];
     structureData: { [name: string]: StructureData };
 
@@ -25,6 +30,8 @@ export default class RoomData {
         this.name = room.name;
 
         this.spawns = [];
+        this.extensions = [];
+        this.noFullSpawnRelateds = [];
         this.structures = [];
         this.structureData = {};
         this.initStructures(room);
@@ -47,15 +54,19 @@ export default class RoomData {
         for (const structure of structures) {
             switch (structure.structureType) {
                 case STRUCTURE_SPAWN:
-                    this.spawns.push(structure.id); break;
+                    this.spawns.push(structure.id);
+                    if (structure.energyCapacity > structure.energy)
+                        this.noFullSpawnRelateds.push(structure.id);
+                    break;
+                case STRUCTURE_EXTENSION:
+                    this.extensions.push(structure.id);
+                    if (structure.energyCapacity > structure.energy)
+                        this.noFullSpawnRelateds.push(structure.id);
+                    break;
             }
 
-            let data = this.structureData[structure.id];
-            if (data == undefined) {
-                data = new StructureData(structure);
-                this.structures.push(structure.id);
-                this.structureData[structure.id] = data;
-            }
+            this.structures.push(structure.id);
+            this.structureData[structure.id] = new StructureData();
         }
     }
 
@@ -67,66 +78,53 @@ export default class RoomData {
         for (const creep of creeps) {
             if (creep.spawning) continue;
 
-            let data = this.creepData[creep.id];
-            if (data == undefined) {
-                data = new CreepData(creep);
+            const creepMemory = creep.memory as CreepMemoryExt;
+            if (creep.my) {
 
-                const creepMemory = creep.memory as CreepMemoryExt;
-                if (creep.my) {
-
-                    const targetId = creepMemory.TaskTargetID;
-                    //init taskTargetCounter
-                    if (targetId != undefined) {
-                        if (targetCounter[targetId] == undefined) {
-                            targetCounter[targetId] = 1;
-                        } else {
-                            targetCounter[targetId] += 1;
-                        }
-                    }
-
-                    if (creepMemory.Task == undefined) {
-                        creepMemory.Task = Task.Idle;
-                    }
-                    const task = creepMemory.Task;
-                    //init taskCounter
-                    if (taskCounter[task] == undefined) {
-                        taskCounter[task] = 1
+                const targetId = creepMemory.TaskTargetID;
+                //init taskTargetCounter
+                if (targetId != undefined) {
+                    if (targetCounter[targetId] == undefined) {
+                        targetCounter[targetId] = 1;
                     } else {
-                        taskCounter[task] += 1
-                    }
-
-                    if (creepMemory.Task == Task.Idle) {
-                        if (_.sum(creep.carry) == 0) this.idleEmptyCreeps.push(creep.id);//init idleEmptyCreeps 
-                        else this.idleNotEmptyCreeps.push(creep.id);//init idleNotEmptyCreeps
+                        targetCounter[targetId] += 1;
                     }
                 }
 
-                this.creeps.push(creep.id);
-                this.creepData[creep.id] = data;
+                if (creepMemory.Task == undefined) {
+                    creepMemory.Task = Task.Idle;
+                }
+                const task = creepMemory.Task;
+                //init taskCounter
+                if (taskCounter[task] == undefined) {
+                    taskCounter[task] = 1
+                } else {
+                    taskCounter[task] += 1
+                }
+
+                if (creepMemory.Task == Task.Idle) {
+                    if (_.sum(creep.carry) == 0) this.idleEmptyCreeps.push(creep.id);//init idleEmptyCreeps 
+                    else this.idleNotEmptyCreeps.push(creep.id);//init idleNotEmptyCreeps
+                }
             }
+
+            this.creeps.push(creep.id);
         }
     }
 
     initSources(room: Room, creepIds: string[]) {
         const counter = this.taskTargetCounter;
-        const sources = room.find(FIND_SOURCES)
+        const sources = room.find(FIND_SOURCES);
 
         for (const source of sources) {
-            let remainingRate = SourceHelper.CalcExpectRate(source);
-            const max = SourceHelper.CalcHarvestRoom(source);
-            let nWorker = 0;
-
-            let teamLength = SourceHelper.CalcTeamLength(nWorker, max);
-            let hasLongTeam = false;
+            const data = new SourceData();
+            let sourceExpectRate = SourceHelper.CalcExpectRate(source);
+            data.maxRoom = SourceHelper.CalcHarvestRoom(source);            
 
             if (counter[source.id] == undefined) {
                 this.sources.push(source.id);
                 this.canHarvestSources.push(source.id);
-                this.sourceData[source.id] = {
-                    harvest: remainingRate,
-                    worker: nWorker,
-                    max: max,
-                };
+                this.sourceData[source.id] = data;
                 continue;
             }
 
@@ -134,24 +132,16 @@ export default class RoomData {
                 const creepMemory = creep.memory as CreepMemoryExt;
                 if (creepMemory.TaskTargetID != source.id) continue;
 
-                nWorker += 1;
-                teamLength = SourceHelper.CalcTeamLength(nWorker, max);
-                hasLongTeam = SourceHelper.IsLongTeam(teamLength);
-                if (hasLongTeam) break;
-
-                remainingRate -= SourceHelper.CalcHarvestRate(creep, source);
-                if (remainingRate <= 0) break;
+                data.workers.push(creep.id);
+                sourceExpectRate -= SourceHelper.CalcHarvestRate(creep);
             }
 
-            if (!hasLongTeam && remainingRate > 0) {
+            if (data.workers.length < data.maxRoom && sourceExpectRate > 0) {
                 this.canHarvestSources.push(source.id);
             }
+
             this.sources.push(source.id);
-            this.sourceData[source.id] = {
-                harvest: remainingRate,
-                worker: nWorker,
-                max: max,
-            };
+            this.sourceData[source.id] = data;
         }
     }
 }

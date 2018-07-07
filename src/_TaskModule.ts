@@ -120,7 +120,7 @@ export default class _TaskModule {
                 hasLongTeam = SourceHelper.IsLongTeam(teamLength);
                 if (hasLongTeam) break;
 
-                remainingRate -= SourceHelper.CalcHarvestRate(creep, source);
+                //remainingRate -= SourceHelper.CalcHarvestRate(creep, source);
                 if (remainingRate <= 0) break;
             }
 
@@ -533,7 +533,7 @@ function TaskProcess_Harvest(room: Room): Boolean {
 
         const hasLongTeam = SourceHelper.IsLongTeam(teamLength)
         if (!hasLongTeam) {
-            sourceData.RemainingRate -= SourceHelper.CalcHarvestRate(creep, source);
+            //sourceData.RemainingRate -= SourceHelper.CalcHarvestRate(creep, source);
             if (sourceData.RemainingRate > 0) {
                 continue;
             }

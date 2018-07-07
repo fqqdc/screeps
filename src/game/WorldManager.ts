@@ -1,4 +1,5 @@
 import RoomManager from "./RoomManager";
+import RoomData from "./RoomData";
 
 export default class WorldManager {
     private static entity: WorldManager;

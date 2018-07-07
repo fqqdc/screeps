@@ -3,15 +3,10 @@ import { MemoryExt, GameCache } from "helper";
 const HARVEST_ADVANCE_TIME = 15;
 
 export const SourceHelper = {
-    CalcHarvestRate(from: Creep, to: Source) {
-        let C = from.carryCapacity - _.sum(from.carry); // usable capacity
-        let R = from.getActiveBodyparts(WORK) * 2; // harvest rate
-        let L = from.pos.findPathTo(to.pos).length - 1; //path length
-
-        let d = (C / R) + L;
-        if (d == 0) return 0;
-
-        return C / d;
+    CalcHarvestRate(creep: Creep | null) {
+        if (creep != null) {
+            return creep.getActiveBodyparts(WORK) * 2;
+        } else { return 0; }
     },
 
     CalcExpectRate(source: Source) {

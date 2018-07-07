@@ -1,5 +1,8 @@
 import { Task } from "Constant";
 import WorldManager from "game/WorldManager";
+import { CreepMemoryExt } from "helper";
+import { CreepHelper } from "helper/CreepHelper";
+import { SourceHelper } from "helper/SourceHelper";
 
 type TaskProcess = { (room: Room): Boolean }
 
@@ -9,15 +12,6 @@ export default class TaskModule {
         for (const roomName in Game.rooms) {
             const room = Game.rooms[roomName];
             if (room.controller == null || !room.controller.my) continue;
-
-            this.InitDroppedResources(room);
-            this.InitCreepArray(room);
-            this.InitSources(room);
-            this.InitBaseBuildings(room)
-            this.InitTowers(room);
-            this.InitConstructionSites(room);
-            this.InitBrokenStructures(room);
-            this.InitStores(room);
 
             this.Check_ExistedTasks(room);
 
@@ -45,6 +39,41 @@ export default class TaskModule {
 
         return seq;
     }
+
+    private Check_ExistedTasks(room: Room): void {
+        //console.log('Process_ExistedTasks:' + room.name); // DEBUG
+
+        for (const creep of roomCache.creeps) {
+            const creepMemory = creep.memory as CreepMemoryExt;
+            switch (creepMemory.Task) {
+                //case Task.Build:
+                //    Check_BuildTask(creep, cacheData); break;
+                case Task.Harvest:
+                    Check_HarvestTask(creep); break;
+                //case Task.Pickup:
+                //    Check_PickupTask(creep, cacheData); break;
+                //case Task.Repair:
+                //    Check_RepairTask(creep, cacheData); break;
+                case Task.Transfer:
+                    Check_TransferTask(creep); break;
+                case Task.UpgradeController:
+                    Check_UpgradeControllerTask(creep); break;
+                //case Task.Withdraw:
+                //    Check_WithdrawTask(creep, cacheData); break;
+            }
+        }
+    }
+}
+
+function Check_HarvestTask(creep: Creep) {
+    const creepMemory = creep.memory as CreepMemoryExt;
+    const source = Game.getObjectById(creepMemory.TaskTargetID) as Source;
+    const rm = WorldManager.Entity.QueryRoom(creep.room);
+
+    if (CreepHelper.IsCreepFull(creep)
+        || SourceHelper.IsSourceEmpty(source)) {
+        rm.SetTask(creep, Task.Idle);
+    }
 }
 
 function GetClosestObject<T extends RoomObject>(from: RoomPosition, arr: T[]): T {
@@ -69,7 +98,7 @@ function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_MinimumUpgradeController:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    if (!rm.HasNotEmptyCreep()) return false;
+    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
     if (!rm.NotUpgradeControllerTask()) return true;
 
     const controller = room.controller as StructureController;
@@ -83,39 +112,43 @@ function TaskProcess_Harvest(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Harvest:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    const roomCache = GameCache.Room[room.name];
-    const cacheData = roomCache.Data;
+    if (rm.GetIdleEmptyCreeps().length == 0) return false;
+    if (rm.GetCanHarvestSources().length == 0) return true;
 
-    if (!rm.HasEmptyCreep()) return false;
-    if (!rm.HasHarvestRoom()) return true;
-
+    const creeps = rm.GetIdleEmptyCreeps();
+    let sources = rm.GetCanHarvestSources();
     do {
-        const creep = cacheData.CreepsIdleEmpty.shift() as Creep;
+        const creep = creeps.shift() as Creep;
+        const source = GetClosestObject(creep.pos, sources);
 
-        //const source = SourceHelper.FindHarvestSourceFor(creep, cache.TargetCounter);
-        const source = GetClosestObject(creep.pos, cacheData.Sources);
-        SetTask(creep, Task.Harvest, source, cacheData);
-        RemoveObject(creep, cacheData.CreepsIdleEmpty);
+        rm.SetTask(creep, Task.Harvest, source);
 
-        const sourceData = cacheData.SourcesData[source.id];
+        sources = rm.GetCanHarvestSources();
+        if (sources.length == 0) return true;
 
-        sourceData.FreeRoom -= 1;
-        const memory = Memory as MemoryExt;
-        const max = memory.sources[source.id].max;
-        const teamLength = SourceHelper.CalcTeamLength(max - sourceData.FreeRoom, max);
+    } while (creeps.length > 0);
 
-        const hasLongTeam = SourceHelper.IsLongTeam(teamLength)
-        if (!hasLongTeam) {
-            sourceData.RemainingRate -= SourceHelper.CalcHarvestRate(creep, source);
-            if (sourceData.RemainingRate > 0) {
-                continue;
-            }
-        }
-
-        RemoveObject(source, cacheData.Sources);
-        if (cacheData.Sources.length == 0) return true;
-
-    } while (cacheData.CreepsIdleEmpty.length > 0);
-
-    return cacheData.Sources.length == 0;
+    return sources.length == 0;
 }
+
+function TaskProcess_FillBase(room: Room): Boolean {
+    if (Memory.debug) console.log('TaskProcess_FillBase:' + room.name); // DEBUG
+    const rm = WorldManager.Entity.QueryRoom(room);
+
+    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
+    if (rm.GetNoFullSpawnRelateds().length == 0) return true;
+
+    const creeps = rm.GetIdleNotEmptyCreeps();
+    do {
+        const creep = creeps.shift() as Creep;
+        const building = GetClosestObject(creep.pos, rm.GetNoFullSpawnRelateds());
+
+        rm.SetTask(creep, Task.Transfer, building);
+
+        if (rm.GetNoFullSpawnRelateds().length == 0) break;
+
+    } while (creeps.length > 0);
+
+    return creeps.length > 0;
+}
+

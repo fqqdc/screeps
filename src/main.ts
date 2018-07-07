@@ -9,18 +9,15 @@ import { Task } from "Constant";
 // When compiling TS to JS and bundling with rollup, the line numbers and file names in error messages change
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
 export const loop = ErrorMapper.wrapLoop(() => {
-    const msg: Message = {
-        roomTaskResults: [],
-    };
 
     const gameModule = new GameModule();
     gameModule.Run();
     const taskModule = new TaskModule();
-    taskModule.Run(msg);
+    taskModule.Run();
     const actionModule = new ActionModule();
     actionModule.Run();
     const produceModule = new ProduceModule();
-    produceModule.Run(msg);
+    produceModule.Run();
 
     ClearCreepMemory();
 

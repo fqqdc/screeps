@@ -1,21 +1,13 @@
 import { Message, GameCache, CreepMemoryExt } from "helper";
 import { Roler, Task } from "Constant";
 import { SpawnHelper } from "helper/SpawnHelper";
+import WorldManager from "game/WorldManager";
 
 export default class ProduceModule {
-    Run(msg: Message) {
-        Process_ProduceWork(msg);
-        Process_TowerWork(msg);
+    Run() {
+        Process_ProduceWork();
+        Process_TowerWork();
     }
-}
-
-function NoIdleCreep(room: Room): Boolean {
-    const roomCache = GameCache.Room[room.name];
-    for (const creep of roomCache.creeps) {
-        const memory = creep.memory as CreepMemoryExt;
-        if (memory.Task == Task.Idle) return true;
-    }
-    return false;
 }
 
 function HasDroppedResource(room: Room): Boolean {
@@ -58,20 +50,23 @@ function HasNotEmptyStore(room: Room): Boolean {
 }
 
 
-function Process_ProduceWork(msg: Message) {
+function Process_ProduceWork() {
     for (const roomCache of GameCache.rooms) {
         const room = roomCache.room;
-        if (!NoIdleCreep(roomCache.room)) continue;
+        const rm = WorldManager.Entity.QueryRoom(room);
 
-        const fullBaseCondition: { (): Boolean } = () => {
-            return HasConstructionSite(room)
-                || HasBrokenStructure(room)
-                || HasNotEmptyStore(room)
-        };
+        if (rm.GetIdleEmptyCreeps().length != 0) continue;
 
-        if (HasDroppedResource(room)
-            || HasHarvestRoom(room)
-            || (IsFullBase(room) && fullBaseCondition())) {
+        //const fullBaseCondition: { (): Boolean } = () => {
+        //    return HasConstructionSite(room)
+        //        || HasBrokenStructure(room)
+        //        || HasNotEmptyStore(room)
+        //};
+
+        if (//HasDroppedResource(room) ||
+            rm.GetCanHarvestSources().length != 0
+            //|| (IsFullBase(room) && fullBaseCondition())
+        ) {
 
             for (const spawn of roomCache.spawns) {
                 if (!spawn.spawning)
@@ -81,7 +76,7 @@ function Process_ProduceWork(msg: Message) {
     }
 }
 
-function Process_TowerWork(msg: Message) {
+function Process_TowerWork() {
     //console.log('Process_TowerWork:' + msg.roomTaskResults.length); // DEBUG
 
     for (const n in Game.structures) {
