@@ -42,12 +42,12 @@ export default class RoomManager {
 
     private updateAddHarvestSource(creepId: string, sourceId: string) {
         const sourceData = this.data.sourceData[sourceId];
-        sourceData.workers.push(creepId);
+        sourceData.harvest.push(creepId);
         //TODO
         sourceData.harvestRate += SourceHelper.CalcHarvestRate(Game.getObjectById<Creep>(creepId));
 
 
-        if (sourceData.workers.length >= sourceData.maxRoom && sourceData.harvestRate <= 0) {
+        if (sourceData.harvest.length >= sourceData.maxRoom && sourceData.harvestRate <= 0) {
             this.removeObject(sourceId, this.data.canHarvestSources);
         }
     }
@@ -87,12 +87,12 @@ export default class RoomManager {
             const source = Game.getObjectById<Source>(oldTargetID);
             //TODO
             const sourceData = this.data.sourceData[oldTargetID];
-            this.removeObject(creep.Id, sourceData.workers);
+            this.removeObject(creep.Id, sourceData.harvest);
             sourceData.harvestRate += SourceHelper.CalcHarvestRate(Game.getObjectById<Creep>(creepId));
             creep.body.filter
 
 
-            if (sourceData.workers.length >= sourceData.maxRoom && sourceData.CalcHarvestRate() <= 0) {
+            if (sourceData.harvest.length >= sourceData.maxRoom && sourceData.CalcHarvestRate() <= 0) {
                 this.removeObject(sourceId, this.data.canHarvestSources);
             }
         }
@@ -178,6 +178,6 @@ export default class RoomManager {
 
     IsFullHarvestToSource(sourceId: string) {
         const sourceData = this.data.sourceData[sourceId];
-        return sourceData.workers.length >= sourceData.maxRoom && sourceData.harvestRate <= 0;
+        return sourceData.harvest.length >= sourceData.maxRoom && sourceData.harvestRate <= 0;
     }
 }

@@ -2,13 +2,14 @@ import { MemoryExt, CreepMemoryExt, GetGameObjects } from "helper";
 import { SourceHelper } from "helper/SourceHelper";
 import { Task } from "Constant";
 import SourceData from "./SourceData";
+import GameSet from "helper/Set";
 
 export default class RoomData {
     name: string;
     taskCounter: HashTable;
     taskTargetCounter: HashTable;
 
-    creeps: string[];
+    creeps: GameSet<Creep>;
     idleEmptyCreeps: string[];
     idleNotEmptyCreeps: string[];
 
@@ -16,11 +17,9 @@ export default class RoomData {
     extensions: string[];
     noFullSpawnRelateds: string[];
 
-    structures: string[];
-    structureData: { [name: string]: StructureData };
+    structures: HashTable<StructureData>;
 
-    sources: string[];
-    sourceData: { [name: string]: SourceData };
+    sources: HashTable<SourceData>;
     canHarvestSources: string[];
 
     constructor(room: Room) {
@@ -32,7 +31,7 @@ export default class RoomData {
         this.spawns = [];
         this.extensions = [];
         this.noFullSpawnRelateds = [];
-        this.structures = [];
+        this.structures = {};
         this.structureData = {};
         this.initStructures(room);
 
@@ -43,9 +42,8 @@ export default class RoomData {
         this.taskTargetCounter = {};
         this.initCountersCreeps(room);
 
-        this.sources = [];
+        this.sources = {};
         this.canHarvestSources = [];
-        this.sourceData = {};
         this.initSources(room, this.creeps);
     }
 
@@ -112,7 +110,7 @@ export default class RoomData {
         }
     }
 
-    initSources(room: Room, creepIds: string[]) {
+    initSources(room: Room, creepIds: HashTable<any>) {
         const counter = this.taskTargetCounter;
         const sources = room.find(FIND_SOURCES);
 
@@ -132,11 +130,11 @@ export default class RoomData {
                 const creepMemory = creep.memory as CreepMemoryExt;
                 if (creepMemory.TaskTargetID != source.id) continue;
 
-                data.workers.push(creep.id);
+                data.harvest.push(creep.id);
                 sourceExpectRate -= SourceHelper.CalcHarvestRate(creep);
             }
 
-            if (data.workers.length < data.maxRoom && sourceExpectRate > 0) {
+            if (data.harvest.length < data.maxRoom && sourceExpectRate > 0) {
                 this.canHarvestSources.push(source.id);
             }
 

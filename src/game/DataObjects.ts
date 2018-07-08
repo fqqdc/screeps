@@ -1,27 +1,29 @@
+import GameSet from "helper/Set";
+
 class ResourceData {
-    pickip: number;
+    pickup: GameSet<Creep>;
 
     constructor() {
-        this.pickip = 0;
+        this.pickup = new GameSet();
     }
 }
 
 class TowerData {
-    transfer: number;
+    transfer: GameSet<Creep>;
 
     constructor() {
-        this.transfer = 0;
+        this.transfer = new GameSet();
     }
 }
 
 class StructureData {
-    repair: number;
-    withdraw: number;
-    transfer: number;
+    repair: GameSet<Creep>;
+    withdraw: GameSet<Creep>;
+    transfer: GameSet<Creep>;
 
     constructor() {
-        this.repair = 0;
-        this.withdraw = 0;
-        this.transfer = 0;
+        this.repair = new GameSet();
+        this.withdraw = new GameSet();
+        this.transfer = new GameSet();
     }
 }

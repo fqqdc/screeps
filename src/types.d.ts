@@ -3,7 +3,7 @@
 declare const require: (module: string) => any;
 
 // add your custom typings here
-type HashTable = { [id: string]: number }
+type HashTable = { [id: string]: Number }
 type Predicate<T> = { (t: T): boolean };
 type StructureSpawnRelated = StructureExtension | StructureSpawn;
 type StructureStorehouse = StructureContainer | StructureStorage;

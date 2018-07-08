@@ -10,12 +10,10 @@ export default class WorldManager {
         return WorldManager.entity;
     }
 
-    private rooms: RoomData[];
-    private roomData: { [name: string]: RoomData };
+    private rooms: HashTable<RoomData>;
 
     private constructor() {
-        this.rooms = [];
-        this.roomData = {};
+        this.rooms = {}
     }
 
     public ScanRooms() {
@@ -24,16 +22,15 @@ export default class WorldManager {
         for (const n in rooms) {
             const room: Room = rooms[n];
 
-            if (this.roomData[room.name] == undefined) {
+            if (this.rooms[room.name] == undefined) {
                 const roomData = new RoomData(room);
-                this.rooms.push(roomData);
-                this.roomData[room.name] = roomData;
+                this.rooms[room.name] = roomData;
             }
         }
     }
 
     public QueryRoom(room: Room): RoomManager {
-        const data = this.roomData[room.name];
+        const data = this.rooms[room.name];
         return RoomManager.Create(room, data);
     }
 }

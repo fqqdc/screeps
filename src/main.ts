@@ -10,14 +10,18 @@ import { Task } from "Constant";
 // This utility uses source maps to get the line numbers and file names of the original, TS source code
 export const loop = ErrorMapper.wrapLoop(() => {
 
-    const gameModule = new GameModule();
-    gameModule.Run();
-    const taskModule = new TaskModule();
-    taskModule.Run();
-    const actionModule = new ActionModule();
-    actionModule.Run();
-    const produceModule = new ProduceModule();
-    produceModule.Run();
+    //const gameModule = new GameModule();
+    //gameModule.Run();
+    //const taskModule = new TaskModule();
+    //taskModule.Run();
+    //const actionModule = new ActionModule();
+    //actionModule.Run();
+    //const produceModule = new ProduceModule();
+    //produceModule.Run();
+    let names = new Set(["aa", "bb", "aa"]);
+    for (const name of names) {
+        console.log(name);
+    }
 
     ClearCreepMemory();
 
