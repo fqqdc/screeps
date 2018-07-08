@@ -97,7 +97,7 @@ export default class _TaskModule {
 
         for (const source of roomCache.sources) {
             let remainingRate = SourceHelper.CalcExpectRate(source);
-            let freeRoom = SourceHelper.CalcHarvestRoom(source);
+            let freeRoom = SourceHelper.CalcMaxHarvestRoom(source);
             const max = memory.sources[source.id].max;
             let teamLength = (0 - freeRoom) / max;
             let hasLongTeam = false;

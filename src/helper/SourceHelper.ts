@@ -33,7 +33,7 @@ export const SourceHelper = {
         return sum;
     },
 
-    CalcHarvestRoom: function (source: Source) {
+    CalcMaxHarvestRoom: function (source: Source) {
         let memory = Memory as MemoryExt;
         if (!isNaN(memory.sources[source.id].max))
             return memory.sources[source.id].max;
@@ -92,7 +92,7 @@ export const SourceHelper = {
             let count = counter[sourceId];
             if (count == undefined)
                 count = 0;
-            const max = this.CalcHarvestRoom(source);
+            const max = this.CalcMaxHarvestRoom(source);
 
             if (max > count) {
                 if (best == null) {

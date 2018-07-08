@@ -76,6 +76,8 @@ function Check_HarvestTask(creep: Creep) {
     }
 }
 
+//TODO function Check_TransferTask(creep: Creep) {
+
 function GetClosestObject<T extends RoomObject>(from: RoomPosition, arr: T[]): T {
     let best: T | undefined;
     let bestPL: Number = Number.MAX_VALUE;

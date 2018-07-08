@@ -161,7 +161,7 @@ export const debug = {
     }
 }
 
-export function GetGameObjects<T>(ids: string[]): T[] {
+export function GetGameObjects<T>(ids: IterableIterator<string>): T[] {
     const arr: T[] = [];
     for (const id of ids) {
         const obj = Game.getObjectById<T>(id);
