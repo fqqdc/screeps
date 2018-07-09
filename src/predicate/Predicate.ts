@@ -1,8 +1,8 @@
-interface IPredicate {
+export interface IPredicate {
     execute(): boolean;
 }
 
-class Predicate implements IPredicate{
+export class Predicate implements IPredicate{
     constructor(private func: () => boolean) { }
 
     execute(): boolean {
@@ -10,8 +10,8 @@ class Predicate implements IPredicate{
     }
 }
 
-class OrPredicate implements IPredicate {
-    constructor(private or: Predicate[]) { }
+export class OrPredicate implements IPredicate {
+    constructor(private or: IPredicate[]) { }
 
     add(p: Predicate) {
         this.or.push(p);
@@ -25,8 +25,8 @@ class OrPredicate implements IPredicate {
     }
 }
 
-class AndPredicate implements IPredicate{
-    constructor(private or: Predicate[]) {}
+export class AndPredicate implements IPredicate{
+    constructor(private or: IPredicate[]) {}
 
     add(p: Predicate) {
         this.or.push(p);
