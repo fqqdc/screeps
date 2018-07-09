@@ -26,13 +26,28 @@ export default class RoomManager {
                 if (source) this.data.updateCanHarvestSources(source);
                 break;
             case Task.Transfer:
+            case Task.Repair:
+            case Task.Withdraw:
                 const struct = Game.getObjectById<AnyStructure>(value.TaskTargetID);
                 if (struct) this.data.updateStructure(struct);
+                else this.data.removeNotExistStructure(value.TaskTargetID);
+                break;
+            case Task.Pickup:
+                const res = Game.getObjectById<Resource>(value.TaskTargetID);
+                if (res) this.data.updataResource(res);
+                else this.data.removeResource(value.TaskTargetID)
+                break;
+            case Task.Build:
+                const site = Game.getObjectById<ConstructionSite>(value.TaskTargetID)
+                if (site) this.data.updateConstructionSite(site);
+                else this.data.removeConstructionSite(value.TaskTargetID);
                 break;
         }
     }
 
     SetTask(creep: Creep, task: Task, target?: TaskTarget) {
+        //console.log(creep.name + " SetTask " + Task[task] + ":" + target)
+
         const creepMemory = creep.memory as CreepMemoryExt;
         const oldValue = { Task: creepMemory.Task, TaskTargetID: creepMemory.TaskTargetID };
 
@@ -55,9 +70,9 @@ export default class RoomManager {
     NotUpgradeControllerTask(): Boolean {
         const set = this.data.taskCounter[Task.UpgradeController];
         if (set) {
-            return set.size > 0;
+            return set.size == 0;
         }
-        return false;
+        return true;
     }
 
     GetNoFullSpawnRelateds(): StructureSpawnRelated[] {
@@ -74,5 +89,29 @@ export default class RoomManager {
 
     GetCanHarvestSources(): Source[] {
         return GetGameObjects<Source>(this.data.canHarvestSources.values());
+    }
+
+    GetNoFullTowers(): StructureTower[] {
+        return GetGameObjects<StructureTower>(this.data.noFullTowers.values());
+    }
+
+    GetNoFullStorages(): StructureStoreable[] {
+        return GetGameObjects<StructureStoreable>(this.data.noFullStorages.values());
+    }
+
+    GetNoEmptyStorages(): StructureStoreable[] {
+        return GetGameObjects<StructureStoreable>(this.data.noEmptyStorages.values());
+    }
+
+    GetConstructionSites(): StructureStoreable[] {
+        return GetGameObjects<StructureStoreable>(this.data.constructionSites.values());
+    }
+
+    GetBrokenStructures(): AnyStructure[] {
+        return GetGameObjects<AnyStructure>(this.data.brokenStructures.values());
+    }
+
+    GetCanPickupResources(): Resource[] {
+        return GetGameObjects<Resource>(this.data.canPickupResources.values());
     }
 }

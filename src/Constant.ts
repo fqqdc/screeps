@@ -1,16 +1,16 @@
 export enum Task {
-    UpgradeController,
-    Pickup,
-    Harvest,
-    Transfer,
-    Build,
-    Repair,
-    Withdraw,
-    Idle,
+    UpgradeController ="UpgradeController",
+    Pickup ="Pickup",
+    Harvest ="Harvest",
+    Transfer ="Transfer",
+    Build = "Build",
+    Repair = "Repair",
+    Withdraw = "Withdraw",
+    Idle = "Idle",
 }
 
 export enum Roler {
-    Worker,
+    Worker = "Worker",
 }
 
 export enum State {

@@ -1,4 +1,4 @@
-import { MemoryExt, GameCache } from "helper";
+import { MemoryExt } from "helper";
 
 const HARVEST_ADVANCE_TIME = 15;
 
@@ -24,15 +24,6 @@ export const SourceHelper = {
         return source.energy / ticksToRegeneration;
     },
 
-    CalcRoomExpectRate(room: Room): Number {
-        const cache = GameCache.FindCache(room);
-        let sum = 0;
-        for (const source of cache.sources) {
-            sum += this.CalcExpectRate(source);
-        }
-        return sum;
-    },
-
     CalcMaxHarvestRoom: function (source: Source) {
         let memory = Memory as MemoryExt;
         if (!isNaN(memory.sources[source.id].max))
@@ -51,82 +42,5 @@ export const SourceHelper = {
 
     IsSourceEmpty: function (source: Source): boolean {
         return source.energy == 0 && source.ticksToRegeneration > HARVEST_ADVANCE_TIME;
-    },
-
-    CalcTeamLength: function (usedRoom: number, max: number): number {
-        return (usedRoom - max) / max;
-    },
-
-    IsLongTeam: function (teamlength: number): boolean {
-        return teamlength > Math.LOG10E;
-    },
-
-    FindHarvestSourceFor: function (creep: Creep, counter: HashTable): Source {
-        const posCreep = creep.pos;
-        const sources = creep.room.find(FIND_SOURCES);
-
-        let best = null;
-        let bestDist: number = Number.MAX_VALUE;
-
-        let opt = null;
-        let optDist: number = Number.MAX_VALUE;
-        let teamLength: number = Number.MAX_VALUE;
-
-        const memory = Memory as MemoryExt;
-
-        for (const i in sources) {
-            const source = sources[i];
-            const sourceteamlength = (counter[source.id] - memory.sources[source.id].max) / memory.sources[source.id].max;
-            //console.log(source.id + ':' + counter[source.id] + '/' + memory.sources[source.id].max + ':' + sourceteamlength);
-        }
-
-        for (const i in sources) {
-            const source = sources[i];
-            const sourceId = source.id;
-            const posSource = source.pos;
-            let sourceDist = posCreep.findPathTo(posSource).length;
-            if (source.energy == 0 && source.ticksToRegeneration > 15)
-                sourceDist += 1000;
-
-
-            let count = counter[sourceId];
-            if (count == undefined)
-                count = 0;
-            const max = this.CalcMaxHarvestRoom(source);
-
-            if (max > count) {
-                if (best == null) {
-                    best = source;
-                    bestDist = sourceDist;
-                } else if (sourceDist < bestDist) {
-                    best = source;
-                    optDist = sourceDist;
-                }
-            } else if (best == null) {
-                const otherTeamLength = this.CalcTeamLength(count, max);
-                if (opt == null) {
-                    opt = source;
-                    optDist = posCreep.findPathTo(posSource).length;
-                    teamLength = otherTeamLength;
-                } else if (otherTeamLength < teamLength) {
-                    opt = source;
-                    optDist = sourceDist;
-                    teamLength = otherTeamLength;
-                } else if (teamLength == otherTeamLength && sourceDist < optDist) {
-                    opt = source;
-                    optDist = sourceDist;
-                    teamLength = otherTeamLength;
-                }
-            }
-        }
-
-        let result;
-        if (best == null) {
-            result = opt;
-        } else {
-            result = best;
-        }
-
-        return result as Source;
     },
 }

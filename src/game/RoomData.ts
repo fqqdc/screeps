@@ -9,30 +9,32 @@ import StructureData from "./StructureData";
 export default class RoomData {
     name: string;
     taskCounter: { [id: string]: Set<string> };
-    taskTargetCounter: { [id: string]: { [task: number]: Set<string> } };
+    taskTargetCounter: { [id: string]: { [task: string]: Set<string> } };
 
     creeps: Set<string>;
     idleEmptyCreeps: Set<string>;
     idleNotEmptyCreeps: Set<string>;
 
-    spawnRelateds: Set<string>;
-    noFullSpawnRelateds: Set<string>;
+    constructionSites: Set<string>;
 
+    noFullSpawnRelateds: Set<string>;
+    noFullTowers: Set<string>;
+    noFullStorages: Set<string>;
+    noEmptyStorages: Set<string>;
+    brokenStructures: Set<string>;
     structures: Set<string>;
 
     sources: HashTable<SourceData>;
     canHarvestSources: Set<string>;
+
+    resources: Set<string>;
+    canPickupResources: Set<string>;
 
     constructor(room: Room) {
         if (room == null)
             throw new Error("room == null");
 
         this.name = room.name;
-
-        this.spawnRelateds = new Set();
-        this.noFullSpawnRelateds = new Set();
-        this.structures = new Set();
-        this.initStructures(room);
 
         this.creeps = new Set();
         this.idleEmptyCreeps = new Set();
@@ -41,9 +43,24 @@ export default class RoomData {
         this.taskTargetCounter = {};
         this.initCreeps(room);
 
+        this.noFullSpawnRelateds = new Set();
+        this.noFullTowers = new Set();
+        this.noFullStorages = new Set();
+        this.noEmptyStorages = new Set();
+        this.brokenStructures = new Set();
+        this.structures = new Set();
+        this.initStructures(room);
+
         this.sources = {};
         this.canHarvestSources = new Set();
         this.initSources(room);
+
+        this.constructionSites = new Set();
+        this.initConstructionSites(room);
+
+        this.resources = new Set();
+        this.canPickupResources = new Set();
+        this.initResources(room);
     }
 
     // Structure
@@ -52,37 +69,130 @@ export default class RoomData {
         this.structures.add(structure.id);
     }
 
-    private updateSpawnRelateds(structure: AnyStructure) {
+    private countTransfer(structure: AnyStructure) {
+        let sumTransfer = 0;
+        const transfer: Creep[] = [];
+        const dict = this.taskTargetCounter[structure.id];
+        if (dict) {
+            const set = dict[Task.Transfer];
+            if (set) {
+                set.forEach(id => {
+                    const creep = Game.getObjectById<Creep>(id);
+                    if (creep) {
+                        const memory = creep.memory as CreepMemoryExt;
+                        if (memory.Task == Task.Transfer)
+                            transfer.push(creep);
+                    }
+                });
+            }
+        }
+
+        for (const creep of transfer) {
+            sumTransfer += creep.carry.energy;
+        }
+
+        return sumTransfer;
+    }
+
+    private countWithdraw(structure: AnyStructure) {
+        let sumWithdraw = 0;
+        const withdraw: Creep[] = [];
+        const dict = this.taskTargetCounter[structure.id];
+        if (dict) {
+            const set = dict[Task.Withdraw];
+            if (set) {
+                set.forEach(id => {
+                    const creep = Game.getObjectById<Creep>(id);
+                    if (creep) {
+                        const memory = creep.memory as CreepMemoryExt;
+                        if (memory.Task == Task.Transfer)
+                            withdraw.push(creep);
+                    }
+                });
+            }
+        }
+
+        for (const creep of withdraw) {
+            sumWithdraw += creep.carryCapacity - _.sum(creep.carry);
+        }
+
+        return sumWithdraw;
+    }
+
+    private countRepair(structure: AnyStructure) {
+        let sumRepair = 0;
+        const repair: Creep[] = [];
+        const dict = this.taskTargetCounter[structure.id];
+        if (dict) {
+            const set = dict[Task.Repair];
+            if (set) {
+                set.forEach(id => {
+                    const creep = Game.getObjectById<Creep>(id);
+                    if (creep) {
+                        const memory = creep.memory as CreepMemoryExt;
+                        if (memory.Task == Task.Transfer)
+                            repair.push(creep);
+                    }
+                });
+            }
+        }
+
+        for (const creep of repair) {
+            sumRepair += creep.getActiveBodyparts(WORK) * 100 * creep.carry.energy;
+        }
+
+        return sumRepair;
+    }
+
+    removeNotExistStructure(structureId: string) {
+        const structure = Game.getObjectById<AnyStructure>(structureId);
+        if (!structure) {
+            this.noFullTowers.delete(structureId);
+            this.noFullStorages.delete(structureId);
+            this.noEmptyStorages.delete(structureId);
+            this.structures.delete(structureId);
+            this.noFullSpawnRelateds.delete(structureId);
+            this.brokenStructures.delete(structureId);
+        }
+    }
+
+    updateStructure(structure: AnyStructure) {
+        const sumRepair = this.countRepair(structure)
+        if (structure.hitsMax > structure.hits + sumRepair) {
+            this.brokenStructures.add(structure.id);
+        } else {
+            this.brokenStructures.delete(structure.id);
+        }
+
+        const sumTransfer = this.countTransfer(structure);
+        const sumWithdraw = this.countWithdraw(structure);
         switch (structure.structureType) {
             case STRUCTURE_SPAWN:
             case STRUCTURE_EXTENSION:
-                this.spawnRelateds.add(structure.id);
-
-                let sumTransfer = 0;
-                const transfer: Creep[] = [];
-                const dict = this.taskTargetCounter[structure.id];
-                if (dict) {
-                    const set = dict[Task.Transfer];
-                    if (set) {
-                        set.forEach(id => {
-                            const creep = Game.getObjectById<Creep>(id);
-                            if (creep) {
-                                const memory = creep.memory as CreepMemoryExt;
-                                if (memory.Task == Task.Transfer)
-                                    transfer.push(creep);
-                            }
-                        });
-                    }
-                }
-
-                for (const creep of transfer) {
-                    sumTransfer += creep.carry.energy;
-                }
-
                 if (structure.energyCapacity > structure.energy + sumTransfer)
                     this.noFullSpawnRelateds.add(structure.id);
                 else
                     this.noFullSpawnRelateds.delete(structure.id);
+                break;
+            case STRUCTURE_TOWER:
+                if (structure.energyCapacity > structure.energy + sumTransfer)
+                    this.noFullTowers.add(structure.id);
+                else
+                    this.noFullTowers.delete(structure.id);
+                break;
+            case STRUCTURE_STORAGE:
+            case STRUCTURE_CONTAINER:
+                if (structure.storeCapacity > _.sum(structure.store) + sumTransfer) {
+                    this.noFullStorages.add(structure.id);
+                } else {
+                    this.noFullStorages.delete(structure.id);
+                }
+                if (structure.store.energy - sumWithdraw > 0) {
+                    this.noEmptyStorages.add(structure.id);
+                } else {
+                    this.noEmptyStorages.delete(structure.id);
+                }
+                break;
         }
     }
 
@@ -90,7 +200,7 @@ export default class RoomData {
         const structures = room.find(FIND_STRUCTURES)
         for (const structure of structures) {
             this.initStructure(structure);
-            this.updateSpawnRelateds(structure);
+            this.updateStructure(structure);
         }
     }
 
@@ -100,7 +210,7 @@ export default class RoomData {
         for (const structure of structures) {
             if (this.structures.has(structure.id)) {
                 this.initStructure(structure);
-                this.updateSpawnRelateds(structure);
+                this.updateStructure(structure);
             }
         }
 
@@ -109,12 +219,9 @@ export default class RoomData {
             if (structure == null) {
                 this.structures.delete(id);
                 this.noFullSpawnRelateds.delete(id);
+                this.noFullTowers.delete(id);
             }
         }
-    }
-
-    updateStructure(structure: AnyStructure) {
-        this.updateSpawnRelateds(structure);
     }
 
     // Creep
@@ -124,17 +231,16 @@ export default class RoomData {
         if (creepMemory.Task == Task.Idle) {
             if (_.sum(creep.carry) == 0) this.idleEmptyCreeps.add(creep.id);//init idleEmptyCreeps 
             else this.idleNotEmptyCreeps.add(creep.id);//init idleNotEmptyCreeps
+        } else {
+            this.idleEmptyCreeps.delete(creep.id);
+            this.idleNotEmptyCreeps.delete(creep.id);
         }
     }
 
     removeCreep(creepId: string) {
         this.removeCreepFromCounter(creepId);
-
-        const creepMemory = Memory.creeps[creepId] as CreepMemoryExt;
-        if (creepMemory.Task == Task.Idle) {
-            this.idleEmptyCreeps.delete(creepId);//update idleEmptyCreeps 
-            this.idleNotEmptyCreeps.add(creepId);//update idleNotEmptyCreeps
-        }
+        this.idleEmptyCreeps.delete(creepId);//update idleEmptyCreeps 
+        this.idleNotEmptyCreeps.add(creepId);//update idleNotEmptyCreeps
         delete Memory.creeps[creepId];
     }
 
@@ -144,6 +250,10 @@ export default class RoomData {
         for (const creep of creeps) {
             if (creep.spawning) continue;
             if (creep.my) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.Task == undefined) {
+                    creepMemory.Task = Task.Idle;
+                }
                 this.updateCreep(creep);
                 this.addCreepToCounter(creep);
             }
@@ -159,7 +269,11 @@ export default class RoomData {
         for (const creep of creeps) {
             if (creep.spawning) continue;
 
-            if (!this.creeps.has(creep.id)) {
+            if (creep.my && !this.creeps.has(creep.id)) {
+                const creepMemory = creep.memory as CreepMemoryExt;
+                if (creepMemory.Task == undefined) {
+                    creepMemory.Task = Task.Idle;
+                }
                 if (creep.my) {
                     this.updateCreep(creep);
                     this.addCreepToCounter(creep);
@@ -197,10 +311,6 @@ export default class RoomData {
             targetCounter[targetId][task].add(creep.id);
         }
 
-        if (creepMemory.Task == undefined) {
-            creepMemory.Task = Task.Idle;
-        }
-
         //set taskCounter
         if (taskCounter[task] == undefined) {
             taskCounter[task] = new Set()
@@ -212,7 +322,10 @@ export default class RoomData {
         const targetCounter = this.taskTargetCounter;
         const taskCounter = this.taskCounter;
 
-        const creepMemory = Memory.creeps[creepId] as CreepMemoryExt;
+        const creep = Game.getObjectById<Creep>(creepId);
+        if (!creep) return;
+
+        const creepMemory = creep.memory as CreepMemoryExt;
         if (creepMemory == undefined)
             return;
 
@@ -224,7 +337,12 @@ export default class RoomData {
             if (targetCounter[targetId] != undefined
                 && targetCounter[targetId][task] != undefined) {
                 targetCounter[targetId][task].delete(creepId);
+
+                if (targetCounter[targetId][task].size == 0)
+                    delete targetCounter[targetId][task];
             }
+            if (Object.keys(targetCounter[targetId]).length == 0)
+                delete targetCounter[targetId];
         }
 
         //set taskCounter
@@ -261,6 +379,8 @@ export default class RoomData {
         const data = this.sources[source.id];
         if (harvest.length < data.maxRoom && sourceExpectRate > 0) {
             this.canHarvestSources.add(source.id);
+        } else {
+            this.canHarvestSources.delete(source.id);
         }
     }
 
@@ -270,7 +390,6 @@ export default class RoomData {
     }
 
     private initSources(room: Room) {
-        const counter = this.taskTargetCounter;
         const sources = room.find(FIND_SOURCES);
 
         for (const source of sources) {
@@ -284,7 +403,7 @@ export default class RoomData {
         const sources = room.find(FIND_SOURCES);
 
         for (const source of sources) {
-            if (counter[source.id] == undefined) {
+            if (this.sources[source.id] == undefined) {
                 this.initSource(source);
                 this.updateCanHarvestSources(source);
             }
@@ -295,5 +414,125 @@ export default class RoomData {
         this.updateCanHarvestSources(source);
     }
 
+    // Construction Site
+    private initConstructionSite(site: ConstructionSite) {
+        this.constructionSites.add(site.id);
+    }
 
+    private initConstructionSites(room: Room) {
+        const sites = room.find(FIND_CONSTRUCTION_SITES);
+
+        for (const site of sites) {
+            this.initConstructionSite(site);
+        }
+    }
+
+    public updateConstructionSites(room: Room) {
+        const sites = room.find(FIND_CONSTRUCTION_SITES);
+
+        for (const site of sites) {
+            this.updateConstructionSite(site);
+        }
+
+        for (const id of Object.keys(this.constructionSites)) {
+            const site = Game.getObjectById<ConstructionSite>(id);
+            if (site == null
+                || !(site instanceof ConstructionSite)) {
+                this.constructionSites.delete(id);
+            }
+        }
+    }
+
+    updateConstructionSite(site: ConstructionSite) {
+        if (!this.constructionSites.has(site.id))
+            this.initConstructionSite(site);
+
+        if (!(site instanceof ConstructionSite))
+            this.constructionSites.delete((site as any).id);
+    }
+
+    removeConstructionSite(siteId: string) {
+        const site = Game.getObjectById<ConstructionSite>(siteId);
+
+        if (!(site) || !(site instanceof ConstructionSite))
+            this.constructionSites.delete(siteId);
+    }
+
+    // Resource
+    private initResource(res: Resource) {
+        this.resources.add(res.id);
+    }
+
+    private initResources(room: Room) {
+        const resources = room.find(FIND_DROPPED_RESOURCES);
+
+        for (const res of resources) {
+            this.initResource(res);
+            this.updataResource(res);
+        }
+    }
+
+    updataResources(room: Room) {
+        const resources = room.find(FIND_DROPPED_RESOURCES);
+
+        for (const res of resources) {
+            if (this.resources.has(res.id)) {
+                this.initResource(res);
+                this.updataResource(res)
+            }
+        }
+
+        for (const id of Object.keys(this.resources)) {
+            const site = Game.getObjectById<Resource>(id);
+            if (site == null
+                || !(site instanceof Resource)) {
+                this.resources.delete(id);
+                this.canPickupResources.delete(id);
+            }
+        }
+    }
+
+    private countPickup(res: Resource) {
+        let sumPickup = 0;
+        const pickup: Creep[] = [];
+        const dict = this.taskTargetCounter[res.id];
+        if (dict) {
+            const set = dict[Task.Pickup];
+            if (set) {
+                set.forEach(id => {
+                    const creep = Game.getObjectById<Creep>(id);
+                    if (creep) {
+                        const memory = creep.memory as CreepMemoryExt;
+                        if (memory.Task == Task.Transfer)
+                            pickup.push(creep);
+                    }
+                });
+            }
+        }
+
+        for (const creep of pickup) {
+            sumPickup += creep.carryCapacity - _.sum(creep.carry);
+        }
+
+        return sumPickup;
+    }
+
+    updataResource(res: Resource) {
+        const sumPickup = this.countPickup(res)
+        if (res.amount > sumPickup) {
+            this.canPickupResources.add(res.id);
+        } else {
+            this.canPickupResources.delete(res.id);
+        }
+    }
+
+    removeResource(resId: string) {
+        const res = Game.getObjectById<Resource>(resId);
+
+        if (!(res) || !(res instanceof Resource)) {
+            this.resources.delete(resId);
+            this.canPickupResources.delete(resId);
+        }
+    }
+    
 }

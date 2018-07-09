@@ -11,24 +11,30 @@ export default class ActionModule {
             if (memory.debug) console.log('PROCESS Action:' + creep.name); // DEBUG
 
             let action: BaseAction = new IdleAction(creep);
-            switch (memory.State) {
-                case State.Harvest:
+            switch (memory.Task) {
+                case Task.Harvest:
                     action = new HarvestAction(creep);
                     break;
-                case State.Transfer:
+                case Task.Transfer:
                     action = new TransferAction(creep);
                     break;
-                case State.UpgradeController:
+                case Task.UpgradeController:
                     action = new UpgradeControllerAction(creep);
                     break;
-                case State.Withdraw:
+                case Task.Withdraw:
                     action = new WithdrawAction(creep);
                     break;
-                case State.Build:
+                case Task.Build:
                     action = new BuildAction(creep);
                     break;
-                case State.Idle:
+                case Task.Idle:
                     action = new IdleAction(creep);
+                    break;
+                case Task.Repair:
+                    action = new RepairAction(creep);
+                    break;
+                case Task.Pickup:
+                    action = new PickupAction(creep);
                     break;
             }
             action.Run();
@@ -47,9 +53,9 @@ abstract class BaseAction {
     protected blueColor: PolyStyle = { stroke: '#0000ff' };
     protected greenColor: PolyStyle = { stroke: '#00ff00' };
 
-    get StateTarget(): Structure | Source | Resource | ConstructionSite {
-        let stateTargetID = (this.creep.memory as CreepMemoryExt).StateTargetID;
-        return Game.getObjectById(stateTargetID) as Structure | Source;
+    get TaskTarget(): TaskTarget {
+        let taskTargetID = (this.creep.memory as CreepMemoryExt).TaskTargetID;
+        return Game.getObjectById(taskTargetID) as TaskTarget;
     }
 
     InRangeTo(to: RoomPosition, range: number) {
@@ -101,7 +107,7 @@ class HarvestAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' HarvestAction');
-        const target = this.StateTarget as Source;
+        const target = this.TaskTarget as Source;
 
         if (memory.debug) console.log(creep.name + ' HarvestAction ' + 'InRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {
@@ -127,7 +133,7 @@ class TransferAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' transferAction');
-        let target = this.StateTarget as Structure;
+        let target = this.TaskTarget as Structure;
 
         if (memory.debug) console.log(creep.name + ' transferAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {
@@ -151,7 +157,7 @@ class UpgradeControllerAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' upgradeControllerAction'); //DEBUG
-        const target = this.StateTarget as StructureController;
+        const target = this.TaskTarget as StructureController;
 
         if (memory.debug) console.log(this.creep.name + ' upgradeControllerAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 3)) {
@@ -177,7 +183,7 @@ class WithdrawAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' WithdrawAction'); //DEBUG
-        let target = this.StateTarget as Structure;
+        let target = this.TaskTarget as Structure;
 
         if (memory.debug) console.log(creep.name + ' withdrawAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {
@@ -202,14 +208,8 @@ class PickupAction extends BaseAction {
     Run() {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
-        if (memory.debug) console.log(creep.name + ' pickupAction ' + 'isFullCreep'); //DEBUG
-        if (this.IsFull())
-            return;
-        let target = this.StateTarget as Resource;
-
-        if (memory.debug) console.log(creep.name + ' pickupAction ' + 'targetIsNull'); //DEBUG
-        if (target == null)
-            return;
+        if (memory.debug) console.log(creep.name + ' PickupAction'); //DEBUG
+        let target = this.TaskTarget as Resource;
 
         if (memory.debug) console.log(creep.name + ' pickupAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {
@@ -234,14 +234,8 @@ class BuildAction extends BaseAction {
     Run() {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
-        if (memory.debug) console.log(creep.name + ' buildAction ' + 'isEmptyCreep'); //DEBUG
-        if (this.IsEmpty())
-            return;
-
-        let target = this.StateTarget as ConstructionSite;
-        if (memory.debug) console.log(creep.name + ' buildAction ' + 'targetIsNull'); //DEBUG
-        if (target == null)
-            return;
+        if (memory.debug) console.log(creep.name + ' BuildAction'); //DEBUG
+        let target = this.TaskTarget as ConstructionSite;
 
         if (memory.debug) console.log(creep.name + ' buildAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 3)) {
@@ -254,6 +248,32 @@ class BuildAction extends BaseAction {
         const result = creep.build(target);
         if (result != OK)
             console.log(creep.name + ' build:' + result);
+        return true;
+    }
+}
+
+class RepairAction extends BaseAction{
+    constructor(creep: Creep) {
+        super(creep);
+    }
+
+    Run() {
+        const creep = this.creep;
+        const memory = creep.memory as CreepMemoryExt
+        if (memory.debug) console.log(creep.name + ' RepairAction'); //DEBUG
+        let target = this.TaskTarget as AnyStructure;
+
+        if (memory.debug) console.log(creep.name + ' repairAction ' + 'inRangeTo'); //DEBUG
+        if (!this.InRangeTo(target.pos, 3)) {
+            this.MoveTo(target.pos, { visualizePathStyle: this.whiteColor });
+            this.Say('⚒repair');
+            return true;
+        }
+
+        if (memory.debug) console.log(creep.name + ' repairAction ' + 'repair'); //DEBUG
+        const result = creep.repair(target);
+        if (result != OK)
+            console.log(creep.name + ' repair:' + result);
         return true;
     }
 }

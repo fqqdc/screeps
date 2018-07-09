@@ -7,6 +7,7 @@ export default class WorldManager {
         if (WorldManager.entity == undefined)
             WorldManager.entity = new WorldManager();
 
+        if (Memory.debug) RawMemory.segments[0] = JSON.stringify(WorldManager.entity, Set_toJSON);
         return WorldManager.entity;
     }
 
@@ -25,6 +26,11 @@ export default class WorldManager {
             if (this.rooms[room.name] == undefined) {
                 const roomData = new RoomData(room);
                 this.rooms[room.name] = roomData;
+            } else {
+                this.rooms[room.name].updateCreeps(room);
+                this.rooms[room.name].updateStructures(room);
+                this.rooms[room.name].updateSources(room);
+                this.rooms[room.name].updateConstructionSites(room);
             }
         }
     }
@@ -33,4 +39,11 @@ export default class WorldManager {
         const data = this.rooms[room.name];
         return RoomManager.Create(room, data);
     }
+}
+
+function Set_toJSON(key: string, value: any) {
+    if (typeof value === 'object' && value instanceof Set) {
+        return [...value];
+    }
+    return value;
 }
