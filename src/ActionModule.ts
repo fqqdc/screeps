@@ -1,4 +1,4 @@
-import { CreepMemoryExt } from "helper";
+import { CreepMemoryExt, RoomMemoryExt } from "helper";
 import { State, Task } from "Constant"
 
 export default class ActionModule {
@@ -66,7 +66,19 @@ abstract class BaseAction {
     }
 
     MoveTo(to: RoomPosition, opts?: MoveToOpts) {
-        this.creep.moveTo(to, opts);
+        if (this.creep.fatigue == 0)
+            this.creep.moveTo(to, opts);
+        else {
+            const room = Game.rooms[to.roomName];
+            if (room) {
+                const mem = room.memory as RoomMemoryExt;
+                if (!mem.trace) mem.trace = {};
+                const pos = this.creep.pos;
+                const index = pos.y * 50 + pos.x;
+                if (mem.trace[index]) mem.trace[index] += 1;
+                else mem.trace[index] = 1;
+            }
+        }
     }
 
     Say(message: string) {
@@ -119,7 +131,7 @@ class HarvestAction extends BaseAction {
         const result = creep.harvest(target);
         if (result != OK) {
             if (result == ERR_NOT_ENOUGH_RESOURCES && target.ticksToRegeneration <= 15) return;
-            console.log(creep.name + ' harvest ' + target.id + ' r:' + result + " ["+Task[memory.Task]+"]");
+            console.log(creep.name + ' harvest ' + target.id + ' r:' + result + " [" + Task[memory.Task] + "]");
         }
     }
 }
@@ -137,7 +149,7 @@ class TransferAction extends BaseAction {
 
         if (memory.debug) console.log(creep.name + ' transferAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {
-            this.MoveTo(target.pos, { visualizePathStyle: this.whiteColor });
+            this.MoveTo(target.pos, { visualizePathStyle: this.blueColor });
             this.Say('🚚transfer');
             return;
         }
@@ -252,7 +264,7 @@ class BuildAction extends BaseAction {
     }
 }
 
-class RepairAction extends BaseAction{
+class RepairAction extends BaseAction {
     constructor(creep: Creep) {
         super(creep);
     }

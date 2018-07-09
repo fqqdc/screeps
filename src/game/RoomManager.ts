@@ -75,6 +75,12 @@ export default class RoomManager {
         return true;
     }
 
+    CalcTask(task: Task): Number {
+        const set = this.data.taskCounter[task];
+        if (set) return set.size;
+        return 0;
+    }
+
     GetNoFullSpawnRelateds(): StructureSpawnRelated[] {
         return GetGameObjects<StructureSpawnRelated>(this.data.noFullSpawnRelateds.values());
     }
@@ -113,5 +119,12 @@ export default class RoomManager {
 
     GetCanPickupResources(): Resource[] {
         return GetGameObjects<Resource>(this.data.canPickupResources.values());
+    }
+
+    UpdateSpawnRelateds() {
+        this.data.structures.forEach(id => {
+            const struct = Game.getObjectById<AnyStructure>(id);
+            if (struct) this.data.updateStructure(struct);
+        });
     }
 }

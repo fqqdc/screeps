@@ -45,5 +45,6 @@ export const loop = ErrorMapper.wrapLoop(() => {
     }
 
     debug.dlog("counterString", counterString);
-    if (Memory.debug) RawMemory.segments[1] = JSON.stringify(Memory);
+    if (Memory.debug)
+        RawMemory.segments[1] = JSON.stringify(Memory);
 });

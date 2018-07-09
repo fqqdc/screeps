@@ -185,6 +185,29 @@ function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
     return true;
 }
 
+function TaskProcess_Pickup(room: Room): Boolean {
+    if (Memory.debug) console.log('TaskProcess_Pickup:' + room.name); // DEBUG
+    const rm = WorldManager.Entity.QueryRoom(room);
+
+    if (rm.GetIdleEmptyCreeps().length == 0) return false;
+    if (rm.GetCanPickupResources().length == 0) return true;
+
+    const creeps = rm.GetIdleEmptyCreeps();
+    let resources = rm.GetCanPickupResources();
+    do {
+        const creep = creeps.shift() as Creep;
+        const res = GetClosestObject(creep.pos, resources);
+
+        rm.SetTask(creep, Task.Pickup, res);
+
+        resources = rm.GetCanPickupResources();
+        if (resources.length == 0) return true;
+
+    } while (creeps.length > 0);
+
+    return resources.length == 0;
+}
+
 function TaskProcess_Harvest(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Harvest:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
@@ -206,29 +229,6 @@ function TaskProcess_Harvest(room: Room): Boolean {
     } while (creeps.length > 0);
 
     return sources.length == 0;
-}
-
-function TaskProcess_Pickup(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_Pickup:' + room.name); // DEBUG
-    const rm = WorldManager.Entity.QueryRoom(room);
-
-    if (rm.GetIdleEmptyCreeps.length == 0) return false;
-    if (rm.GetCanPickupResources().length == 0) return true;
-
-    const creeps = rm.GetIdleEmptyCreeps();
-    let resources = rm.GetCanPickupResources();
-    do {
-        const creep = creeps.shift() as Creep;
-        const res = GetClosestObject(creep.pos, resources);
-
-        rm.SetTask(creep, Task.Pickup, res);
-
-        resources = rm.GetCanPickupResources();
-        if (resources.length == 0) return true;
-
-    } while (creeps.length > 0);
-
-    return resources.length == 0;
 }
 
 function TaskProcess_FillBase(room: Room): Boolean {

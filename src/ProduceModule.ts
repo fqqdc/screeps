@@ -2,6 +2,7 @@ import { CreepMemoryExt } from "helper";
 import { Roler, Task } from "Constant";
 import { SpawnHelper } from "helper/SpawnHelper";
 import WorldManager from "game/WorldManager";
+import RoomManager from "game/RoomManager";
 
 export default class ProduceModule {
     Run() {
@@ -10,27 +11,67 @@ export default class ProduceModule {
     }
 }
 
+function c_NoIdleEmptyCreeps(rm: RoomManager) {
+    return rm.GetIdleEmptyCreeps().length != 0;
+}
+
+function c_HasCanPickupResources(rm: RoomManager) {
+    return rm.GetCanPickupResources().length != 0;
+}
+
+function c_HasCanHarvestSources(rm: RoomManager) {
+    return rm.GetCanHarvestSources().length != 0;
+}
+
+function c_HasFullBase(rm: RoomManager) {
+    return rm.GetNoFullSpawnRelateds().length == 0;
+}
+
+function c_HasMoreEnergy(rm: RoomManager) {
+    return rm.GetNoEmptyStorages().length != 0;
+}
+
+function c_NoManToBuild(rm: RoomManager) {
+    return rm.GetConstructionSites().length != 0 && rm.CalcTask(Task.Build) == 0;
+}
+
+function c_NoManToRepair(rm: RoomManager) {
+    return rm.GetBrokenStructures().length != 0 && rm.CalcTask(Task.Repair) == 0;
+}
+
+
+
 function Process_ProduceWork() {
     for (const name in Game.rooms) {
         const room = Game.rooms[name];
         const rm = WorldManager.Entity.QueryRoom(room);
 
-        if (rm.GetIdleEmptyCreeps().length != 0) continue;
+        if (c_NoIdleEmptyCreeps(rm)) continue;
 
-        const fullBaseCondition: { (): Boolean } = () => {
-            return rm.GetConstructionSites().length != 0
-                || rm.GetBrokenStructures().length != 0
-                || rm.GetNoEmptyStorages().length != 0
-        };
+        const spawns = room.find(FIND_MY_SPAWNS);
+        for (const spawn of spawns) {
+            if (!spawn.spawning) {
 
-        if (rm.GetCanPickupResources().length != 0
-            || rm.GetCanHarvestSources().length != 0
-            || (rm.GetNoFullSpawnRelateds().length == 0 && fullBaseCondition())
-        ) {
-            const spawns = room.find(FIND_MY_SPAWNS);
-            for (const spawn of spawns) {
-                if (!spawn.spawning) {
+                const condition: { (): Boolean } = () => {
+                    return rm.GetConstructionSites().length != 0
+                        || rm.GetBrokenStructures().length != 0
+                };
+
+                if (c_HasCanPickupResources(rm)
+                    || c_HasCanHarvestSources(rm)
+                    || (c_HasFullBase(rm) && c_HasMoreEnergy(rm) && (c_NoManToBuild(rm) || c_NoManToRepair(rm)))
+                ) {
+                    console.log("1 HasCanPickupResources:" + c_HasCanPickupResources(rm));
+                    console.log("2 HasCanHarvestSources:" + c_HasCanHarvestSources(rm));
+                    console.log("3 HasFullBase:" + c_HasFullBase(rm));
+                    console.log("3 HasMoreEnergy:" + c_HasMoreEnergy(rm))
+                    if (c_HasFullBase(rm) && c_HasMoreEnergy(rm)) {
+                        console.log("..1 NoManToBuild:" + c_NoManToBuild(rm))
+                        console.log("..2 NoManToRepair:" + c_NoManToRepair(rm))
+                    }
+
                     SpawnHelper.CreateCreep(spawn, "MMWC", Roler.Worker);
+                    rm.UpdateSpawnRelateds();
                 }
             }
         }
@@ -45,6 +86,7 @@ function Process_TowerWork() {
         if (structure.structureType == STRUCTURE_TOWER) {
 
             let tower = structure as StructureTower;
+            const rm = WorldManager.Entity.QueryRoom(tower.room);
             var closestHostile = tower.pos.findClosestByRange(FIND_HOSTILE_CREEPS);
             if (closestHostile != null) {
                 tower.attack(closestHostile);
@@ -55,6 +97,7 @@ function Process_TowerWork() {
 
             var closestDamagedStructure = tower.pos.findClosestByRange(FIND_STRUCTURES, {
                 filter: (structure) => structure.hits < structure.hitsMax * 0.5
+                    && rm.CalcTask(Task.Repair) == 0
             });
 
             if (closestDamagedStructure) {

@@ -14,6 +14,10 @@ export interface CreepMemoryExt extends CreepMemory {
     debug: boolean;
 }
 
+export interface RoomMemoryExt extends RoomMemory {
+    trace: HashTable<number>;
+}
+
 export const ClearCreepMemory = function () {
     if (Game.time % 1000 == 0) {
         for (var name in Memory.creeps) {

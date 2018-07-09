@@ -7,7 +7,8 @@ export default class WorldManager {
         if (WorldManager.entity == undefined)
             WorldManager.entity = new WorldManager();
 
-        if (Memory.debug) RawMemory.segments[0] = JSON.stringify(WorldManager.entity, Set_toJSON);
+        //if (Memory.debug)
+            RawMemory.segments[0] = JSON.stringify(WorldManager.entity, Set_toJSON);
         return WorldManager.entity;
     }
 
@@ -31,6 +32,7 @@ export default class WorldManager {
                 this.rooms[room.name].updateStructures(room);
                 this.rooms[room.name].updateSources(room);
                 this.rooms[room.name].updateConstructionSites(room);
+                this.rooms[room.name].updataResources(room);
             }
         }
     }

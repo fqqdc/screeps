@@ -24,6 +24,19 @@ export const SourceHelper = {
         return source.energy / ticksToRegeneration;
     },
 
+    CalcEnergy(source: Source) {
+        let ticksToRegeneration = source.ticksToRegeneration;
+        let energy = source.energy;
+        if (ticksToRegeneration == undefined)
+            ticksToRegeneration = 300;
+
+        if (ticksToRegeneration <= HARVEST_ADVANCE_TIME) {
+            energy += source.energyCapacity;
+        }
+
+        return energy;
+    },
+
     CalcMaxHarvestRoom: function (source: Source) {
         let memory = Memory as MemoryExt;
         if (!isNaN(memory.sources[source.id].max))

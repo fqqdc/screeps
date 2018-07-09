@@ -4,7 +4,6 @@ declare const require: (module: string) => any;
 
 // add your custom typings here
 type HashTable<T> = { [id: string]: T }
-type Predicate<T> = { (t: T): boolean };
 type StructureSpawnRelated = StructureExtension | StructureSpawn;
 type StructureStoreable = StructureContainer | StructureStorage;
 type TaskTarget = Source | AnyStructure | ConstructionSite | Resource ;
