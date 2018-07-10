@@ -1,5 +1,5 @@
 import { CreepMemoryExt, RoomMemoryExt } from "helper";
-import { State, Task } from "Constant"
+import { Task } from "Constant"
 
 export default class ActionModule {
     Run() {
@@ -13,7 +13,7 @@ export default class ActionModule {
             let action: BaseAction = new IdleAction(creep);
             switch (memory.Task) {
                 case Task.Harvest:
-                    action = new HarvestAction(creep);
+                    action = new HarvestAction(creep, memory.TaskTargetID);
                     break;
                 case Task.Transfer:
                     action = new TransferAction(creep);
@@ -42,7 +42,7 @@ export default class ActionModule {
     }
 }
 
-abstract class BaseAction {
+export abstract class BaseAction {
     constructor(creep: Creep) {
         this.creep = creep;
     }
@@ -93,13 +93,13 @@ abstract class BaseAction {
     }
 
     IsEmpty(): boolean {
-        return 0 == this.creep.carry.energy;
+        return 0 == _.sum(this.creep.carry);
     }
 
     abstract Run(): void;
 }
 
-class IdleAction extends BaseAction {
+export class IdleAction extends BaseAction {
     constructor(creep: Creep) {
         super(creep);
     }
@@ -112,8 +112,8 @@ class IdleAction extends BaseAction {
     }
 }
 
-class HarvestAction extends BaseAction {
-    constructor(creep: Creep) {
+export class HarvestAction extends BaseAction {
+    constructor(creep: Creep, private targetId?: string) {
         super(creep);
     }
 
@@ -121,7 +121,8 @@ class HarvestAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' HarvestAction');
-        const target = this.TaskTarget as Source;
+        const target = Game.getObjectById(this.targetId) as Source;
+        if (!target) return;
 
         if (memory.debug) console.log(creep.name + ' HarvestAction ' + 'InRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {
@@ -138,8 +139,8 @@ class HarvestAction extends BaseAction {
     }
 }
 
-class TransferAction extends BaseAction {
-    constructor(creep: Creep) {
+export class TransferAction extends BaseAction {
+    constructor(creep: Creep, private targetId?: string) {
         super(creep);
     }
 
@@ -148,6 +149,7 @@ class TransferAction extends BaseAction {
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' transferAction');
         let target = this.TaskTarget as Structure;
+        if (!target) return;
 
         if (memory.debug) console.log(creep.name + ' transferAction ' + 'inRangeTo'); //DEBUG
         if (!this.InRangeTo(target.pos, 1)) {

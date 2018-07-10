@@ -1,5 +1,4 @@
-import { MapCache } from "lodash";
-import { Task, State } from "Constant";
+import { Task, Automatic, } from "Constant";
 
 /*
  * 扩展Memory操作 
@@ -11,22 +10,18 @@ export interface MemoryExt extends Memory {
 export interface CreepMemoryExt extends CreepMemory {
     Task: Task;
     TaskTargetID: string;
+    Automatic: Automatic;
+    AutoTask: Task;
+    AutoTaskTarget: AutomaticTaskTarget;
     debug: boolean;
+}
+
+export interface AutomaticTaskTarget {
+    TargetID?: string;
 }
 
 export interface RoomMemoryExt extends RoomMemory {
     trace: HashTable<number>;
-}
-
-export const ClearCreepMemory = function () {
-    if (Game.time % 1000 == 0) {
-        for (var name in Memory.creeps) {
-            if (!Game.creeps[name]) {
-                delete Memory.creeps[name];
-                console.log('Clearing non-existing creep memory:', name);
-            }
-        }
-    }
 }
 
 export const debug = {
@@ -51,4 +46,14 @@ export function GetGameObjects<T>(ids: IterableIterator<string>): T[] {
     return arr;
 }
 
+export const ClearCreepMemory = function () {
+    if (Game.time % 1000 == 0) {
+        for (var name in Memory.creeps) {
+            if (!Game.creeps[name]) {
+                delete Memory.creeps[name];
+                console.log('Clearing non-existing creep memory:', name);
+            }
+        }
+    }
+}
 

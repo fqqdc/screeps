@@ -157,7 +157,7 @@ function Check_WithdrawTask(creep: Creep) {
     }
 }
 
-function GetClosestObject<T extends RoomObject>(from: RoomPosition, arr: T[]): T {
+function GetClosestObject<T extends _HasRoomPosition>(from: RoomPosition, arr: T[]): T {
     let best: T | undefined;
     let bestPL: Number = Number.MAX_VALUE;
 

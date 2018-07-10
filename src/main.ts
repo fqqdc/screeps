@@ -2,7 +2,7 @@ import { ErrorMapper } from "utils/ErrorMapper";
 import GameModule from "GameModule";
 import TaskModule from "TaskModule";
 import ActionModule from "ActionModule";
-import { ClearCreepMemory, CreepMemoryExt, debug } from "helper";
+import { CreepMemoryExt, debug, ClearCreepMemory } from "helper";
 import ProduceModule from "ProduceModule";
 import { Task } from "Constant";
 
@@ -20,7 +20,6 @@ export const loop = ErrorMapper.wrapLoop(() => {
     produceModule.Run();
 
     //ClearCreepMemory();
-
 
     let counter: { [key: string]: number } = {};
     for (const name in Game.creeps) {

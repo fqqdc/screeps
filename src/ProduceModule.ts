@@ -32,11 +32,15 @@ function c_HasMoreEnergy(rm: RoomManager) {
 }
 
 function c_NoManToBuild(rm: RoomManager) {
-    return rm.GetConstructionSites().length != 0 && rm.CalcTask(Task.Build) == 0;
+    return rm.GetConstructionSites().length != 0
+        && rm.CalcTask(Task.Withdraw) == 0
+        && rm.CalcTask(Task.Build) == 0;
 }
 
 function c_NoManToRepair(rm: RoomManager) {
-    return rm.GetBrokenStructures().length != 0 && rm.CalcTask(Task.Repair) == 0;
+    return rm.GetBrokenStructures().length != 0
+        && rm.CalcTask(Task.Withdraw) == 0
+        && rm.CalcTask(Task.Repair) == 0;
 }
 
 
@@ -66,7 +70,7 @@ function Process_ProduceWork() {
                     const c3 = c_HasFullBase(rm);
                     const c33 = c_HasMoreEnergy(rm);
                     if (c1) console.log("1 HasCanPickupResources:" + c1);
-                    if (c2) console.log("2 HasCanHarvestSources:" + c2 );
+                    if (c2) console.log("2 HasCanHarvestSources:" + c2);
                     if (c3) console.log("3 HasFullBase:" + c3);
                     if (c33) console.log("3 HasMoreEnergy:" + c33)
 

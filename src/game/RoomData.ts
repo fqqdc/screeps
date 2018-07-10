@@ -1,9 +1,8 @@
-import { MemoryExt, CreepMemoryExt, GetGameObjects } from "helper";
+import { MemoryExt, CreepMemoryExt, GetGameObjects, debug } from "helper";
 import { SourceHelper } from "helper/SourceHelper";
 import { Task } from "Constant";
 import SourceData from "./SourceData";
 import GameSet from "helper/Set";
-import { IMediator, IMessage } from "GameObject/Mediator";
 import StructureData from "./StructureData";
 
 export default class RoomData {
@@ -11,7 +10,7 @@ export default class RoomData {
     taskCounter: { [id: string]: Set<string> };
     taskTargetCounter: { [id: string]: { [task: string]: Set<string> } };
 
-    creeps: Set<string>;
+    creeps: HashTable<string>;
     idleEmptyCreeps: Set<string>;
     idleHasEnergyCreeps: Set<string>;
     idleNotEmptyCreeps: Set<string>;
@@ -37,7 +36,7 @@ export default class RoomData {
 
         this.name = room.name;
 
-        this.creeps = new Set();
+        this.creeps = {}
         this.idleEmptyCreeps = new Set();
         this.idleHasEnergyCreeps = new Set();
         this.idleNotEmptyCreeps = new Set();
@@ -203,11 +202,13 @@ export default class RoomData {
 
     private clearCreep(creepId: string) {
         this.removeCreepFromCounter(creepId);
-        this.creeps.delete(creepId);
         this.idleEmptyCreeps.delete(creepId);//update idleEmptyCreeps 
         this.idleNotEmptyCreeps.delete(creepId);//update idleNotEmptyCreeps
         this.idleHasEnergyCreeps.delete(creepId);
-        delete Memory.creeps[creepId];
+
+        const name = this.creeps[creepId];
+        delete this.creeps[creepId];
+        delete Game.creeps[name];
     }
 
     private initCreep(creep: Creep) {
@@ -215,7 +216,7 @@ export default class RoomData {
         if (creepMemory.Task == undefined) {
             creepMemory.Task = Task.Idle;
         }
-        this.creeps.add(creep.id);
+        this.creeps[creep.id] = creep.name;
     }
 
     private initCreeps(room: Room) {
@@ -235,13 +236,13 @@ export default class RoomData {
 
         for (const creep of creeps) {
             if (creep.spawning || !creep.my) continue;
-            if (!this.creeps.has(creep.id)) {
+            if (!this.creeps[creep.id]) {
                 this.initCreep(creep);
                 this.addCreepToCounter(creep.id);
             }
         }
 
-        for (const creepId of this.creeps) {
+        for (const creepId in this.creeps) {
             this.updateCreepById(creepId);
         }
     }
@@ -255,12 +256,9 @@ export default class RoomData {
     }
 
     private checkCreepMemory(creepId: string): CreepMemoryExt | null {
-        //const creepMemory = Memory.creeps[creepId] as CreepMemoryExt;
-        //if (!creepMemory) return null;
-        const creep = Game.getObjectById<Creep>(creepId);
-        if (!creep || creep instanceof Creep == false)
-            return null;
-        const creepMemory = creep.memory as CreepMemoryExt;
+        const creepName = this.creeps[creepId];
+        if (!creepName) return null;
+        const creepMemory = Memory.creeps[creepName] as CreepMemoryExt;
 
         const targetId = creepMemory.TaskTargetID;
         const task = creepMemory.Task;
@@ -472,15 +470,4 @@ export default class RoomData {
         else
             this.clearResources(id);
     }
-
-    // Tomb Stone
-
-    //private initTombstones(room: Room) {
-    //    const tombstones = room.find(FIND_TOMBSTONES);
-
-    //    for (const tomb of tombstones) {
-    //        this.initResource(res);
-    //        this.updataResource(res);
-    //    }
-    //}
 }

@@ -9,10 +9,11 @@ export enum Task {
     Idle = "Idle",
 }
 
-export enum Roler {
-    Worker = "Worker",
+export enum Automatic {
+    None = "None",
+    Harvest = "Harvest",
 }
 
-export enum State {
-    Unknown,
+export enum Roler {
+    Worker = "Worker",
 }
