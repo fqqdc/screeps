@@ -89,5 +89,3 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 src/main_t.ts
-rollup.config.js
-rollup.config.js
