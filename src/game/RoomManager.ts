@@ -72,6 +72,10 @@ export default class RoomManager {
         return GetGameObjects<Creep>(this.data.idleNotEmptyCreeps.values());
     }
 
+    GetIdleHasEnergyCreeps(): Creep[] {
+        return GetGameObjects<Creep>(this.data.idleHasEnergyCreeps.values());
+    }
+
     GetIdleEmptyCreeps(): Creep[] {
         return GetGameObjects<Creep>(this.data.idleEmptyCreeps.values());
     }

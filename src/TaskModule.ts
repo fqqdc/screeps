@@ -75,7 +75,7 @@ function Check_BuildTask(creep: Creep) {
     const rm = WorldManager.Entity.QueryRoom(creep.room);
 
     if (site == null
-        || CreepHelper.IsCreepEmpty(creep)
+        || CreepHelper.IsCreepEmptyEnergy(creep)
         || SiteHelper.IsConstructionSite(site)) {
         rm.SetTask(creep, Task.Idle);
     }
@@ -112,7 +112,7 @@ function Check_RepairTask(creep: Creep) {
     const structure = Game.getObjectById(creepMemory.TaskTargetID) as AnyStructure;
 
     if (structure == null
-        || CreepHelper.IsCreepEmpty(creep)
+        || CreepHelper.IsCreepEmptyEnergy(creep)
         || structure.hits == structure.hitsMax) {
         rm.SetTask(creep, Task.Idle);
     }
@@ -125,6 +125,9 @@ function Check_TransferTask(creep: Creep) {
     const rm = WorldManager.Entity.QueryRoom(creep.room);
 
     if (structure == null
+        || CreepHelper.IsCreepEmptyEnergy(creep) && (structure.structureType == STRUCTURE_EXTENSION
+            || structure.structureType == STRUCTURE_SPAWN
+            || structure.structureType == STRUCTURE_TOWER)
         || CreepHelper.IsCreepEmpty(creep)
         || StructureHelper.IsFullStructure(structure)) {
         rm.SetTask(creep, Task.Idle);
@@ -136,7 +139,7 @@ function Check_UpgradeControllerTask(creep: Creep) {
     if (creepMemory.debug) console.log('Check_UpgradeControllerTask:' + creep.name); // DEBUG    
     const rm = WorldManager.Entity.QueryRoom(creep.room);
 
-    if (CreepHelper.IsCreepEmpty(creep)) {
+    if (CreepHelper.IsCreepEmptyEnergy(creep)) {
         rm.SetTask(creep, Task.Idle);
     }
 }
@@ -176,11 +179,11 @@ function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_MinimumUpgradeController:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
+    if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.CalcTask(Task.UpgradeController) > 0) return true;
 
     const controller = room.controller as StructureController;
-    const creep = GetClosestObject(controller.pos, rm.GetIdleNotEmptyCreeps());
+    const creep = GetClosestObject(controller.pos, rm.GetIdleHasEnergyCreeps());
     rm.SetTask(creep, Task.UpgradeController, controller);
 
     return true;
@@ -236,10 +239,10 @@ function TaskProcess_FillBase(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_FillBase:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
+    if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetNoFullSpawnRelateds().length == 0) return true;
 
-    const creeps = rm.GetIdleNotEmptyCreeps();
+    const creeps = rm.GetIdleHasEnergyCreeps();
     do {
         const creep = creeps.shift() as Creep;
         const building = GetClosestObject(creep.pos, rm.GetNoFullSpawnRelateds());
@@ -257,10 +260,10 @@ function TaskProcess_FillTower(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_FillTower:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
+    if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetNoFullTowers().length == 0) return true;
 
-    const creeps = rm.GetIdleNotEmptyCreeps();
+    const creeps = rm.GetIdleHasEnergyCreeps();
     do {
         const creep = creeps.shift() as Creep;
         const tower = GetClosestObject(creep.pos, rm.GetNoFullTowers());
@@ -301,10 +304,10 @@ function TaskProcess_Build(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Build:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
+    if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetConstructionSites().length == 0) return true;
 
-    const creeps = rm.GetIdleNotEmptyCreeps();
+    const creeps = rm.GetIdleHasEnergyCreeps();
     do {
         const creep = creeps.shift() as Creep;
         const site = GetClosestObject(creep.pos, rm.GetConstructionSites());
@@ -339,10 +342,10 @@ function TaskProcess_Repair(room: Room): Boolean {
     if (Memory.debug) console.log('TaskProcess_Repair:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
-    if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
+    if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetBrokenStructures().length == 0) return true;
 
-    const creeps = rm.GetIdleNotEmptyCreeps();
+    const creeps = rm.GetIdleHasEnergyCreeps();
     do {
         const creep = creeps.shift() as Creep;
         const broken = GetClosestObject(creep.pos, rm.GetBrokenStructures());

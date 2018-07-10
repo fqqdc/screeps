@@ -38,10 +38,6 @@ export const SourceHelper = {
     },
 
     CalcMaxHarvestRoom: function (source: Source) {
-        let memory = Memory as MemoryExt;
-        if (!isNaN(memory.sources[source.id].max))
-            return memory.sources[source.id].max;
-
         let countWall = 0;
         let pos = source.pos;
         for (let x = -1; x < 2; x++)
@@ -50,7 +46,7 @@ export const SourceHelper = {
                     countWall += 1;
             }
 
-        return memory.sources[source.id].max = 9 - countWall;
+        return 9 - countWall;
     },
 
     IsSourceEmpty: function (source: Source): boolean {

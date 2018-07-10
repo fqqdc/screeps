@@ -13,6 +13,7 @@ export default class RoomData {
 
     creeps: Set<string>;
     idleEmptyCreeps: Set<string>;
+    idleHasEnergyCreeps: Set<string>;
     idleNotEmptyCreeps: Set<string>;
 
     constructionSites: Set<string>;
@@ -38,6 +39,7 @@ export default class RoomData {
 
         this.creeps = new Set();
         this.idleEmptyCreeps = new Set();
+        this.idleHasEnergyCreeps = new Set();
         this.idleNotEmptyCreeps = new Set();
         this.taskCounter = {};
         this.taskTargetCounter = {};
@@ -181,12 +183,22 @@ export default class RoomData {
     private groupingCreep(creep: Creep) {
         const creepMemory = creep.memory as CreepMemoryExt;
         if (creepMemory.Task == Task.Idle) {
-            if (_.sum(creep.carry) == 0) this.idleEmptyCreeps.add(creep.id);//init idleEmptyCreeps 
-            else this.idleNotEmptyCreeps.add(creep.id);//init idleNotEmptyCreeps
-        } else {
+            if (_.sum(creep.carry) == 0) {
+                this.idleEmptyCreeps.add(creep.id);//init idleEmptyCreeps
+            } else {
+                this.idleNotEmptyCreeps.add(creep.id);//init idleNotEmptyCreeps
+
+                // idleHasEnergyCreeps
+                if (creep.carry.energy != 0) this.idleHasEnergyCreeps.add(creep.id);
+                else this.idleHasEnergyCreeps.delete(creep.id);
+            }
+        }
+        else {
             this.idleEmptyCreeps.delete(creep.id);
             this.idleNotEmptyCreeps.delete(creep.id);
+            this.idleHasEnergyCreeps.delete(creep.id);
         }
+
     }
 
     private clearCreep(creepId: string) {
@@ -194,6 +206,7 @@ export default class RoomData {
         this.creeps.delete(creepId);
         this.idleEmptyCreeps.delete(creepId);//update idleEmptyCreeps 
         this.idleNotEmptyCreeps.delete(creepId);//update idleNotEmptyCreeps
+        this.idleHasEnergyCreeps.delete(creepId);
         delete Memory.creeps[creepId];
     }
 
@@ -279,14 +292,16 @@ export default class RoomData {
         taskCounter[task].add(creepId);
 
         //set taskTargetCounter
-        if (!targetCounter[targetId]) {
-            targetCounter[targetId] = {};
+        if (targetId) {
+            if (!targetCounter[targetId]) {
+                targetCounter[targetId] = {};
+            }
+            let table = targetCounter[targetId];
+            if (!table[task]) {
+                table[task] = new Set();
+            }
+            table[task].add(creepId);
         }
-        let table = targetCounter[targetId];
-        if (!table[task]) {
-            table[task] = new Set();
-        }
-        table[task].add(creepId);
     }
 
     removeCreepFromCounter(creepId: string) {
@@ -305,15 +320,17 @@ export default class RoomData {
         }
 
         //set taskTargetCounter
-        const taskSets = taskTargetCounter[targetId];
-        if (taskSets) {
-            const set = taskSets[task];
-            if (set) {
-                set.delete(creepId);
-                if (set.size == 0) delete taskSets[task];
+        if (targetId) {
+            const taskSets = taskTargetCounter[targetId];
+            if (taskSets) {
+                const set = taskSets[task];
+                if (set) {
+                    set.delete(creepId);
+                    if (set.size == 0) delete taskSets[task];
+                }
+                if (Object.keys(taskSets).length == 0)
+                    delete taskTargetCounter[targetId];
             }
-            if (Object.keys(taskSets).length == 0)
-                delete taskTargetCounter[targetId];
         }
     }
 

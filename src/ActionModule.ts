@@ -66,8 +66,9 @@ abstract class BaseAction {
     }
 
     MoveTo(to: RoomPosition, opts?: MoveToOpts) {
-        if (this.creep.fatigue == 0)
+        if (this.creep.fatigue == 0) {
             this.creep.moveTo(to, opts);
+        }
         else {
             const room = Game.rooms[to.roomName];
             if (room) {
@@ -107,6 +108,7 @@ class IdleAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' IdleAction');
+        creep.move(((Math.random() * 100 % 8) + 1) as DirectionConstant);
     }
 }
 
@@ -154,7 +156,13 @@ class TransferAction extends BaseAction {
             return;
         }
         if (memory.debug) console.log(this.creep.name + ' transferAction ' + 'transfer'); //DEBUG
-        const result = creep.transfer(target, RESOURCE_ENERGY);
+
+        let result: ScreepsReturnCode = OK;
+        for (const t in creep.carry) {
+            if (creep.carry[t as ResourceConstant] == 0) continue;
+            result = creep.transfer(target, t as ResourceConstant);
+            break;
+        }
         if (result != OK)
             console.log(creep.name + ' transferAction:' + result);
     }

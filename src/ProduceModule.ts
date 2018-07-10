@@ -61,10 +61,15 @@ function Process_ProduceWork() {
                     || c_HasCanHarvestSources(rm)
                     || (c_HasFullBase(rm) && c_HasMoreEnergy(rm) && (c_NoManToBuild(rm) || c_NoManToRepair(rm)))
                 ) {
-                    console.log("1 HasCanPickupResources:" + c_HasCanPickupResources(rm));
-                    console.log("2 HasCanHarvestSources:" + c_HasCanHarvestSources(rm));
-                    console.log("3 HasFullBase:" + c_HasFullBase(rm));
-                    console.log("3 HasMoreEnergy:" + c_HasMoreEnergy(rm))
+                    const c1 = c_HasCanPickupResources(rm);
+                    const c2 = c_HasCanHarvestSources(rm);
+                    const c3 = c_HasFullBase(rm);
+                    const c33 = c_HasMoreEnergy(rm);
+                    if (c1) console.log("1 HasCanPickupResources:" + c1);
+                    if (c2) console.log("2 HasCanHarvestSources:" + c2 );
+                    if (c3) console.log("3 HasFullBase:" + c3);
+                    if (c33) console.log("3 HasMoreEnergy:" + c33)
+
                     if (c_HasFullBase(rm) && c_HasMoreEnergy(rm)) {
                         console.log("..1 NoManToBuild:" + c_NoManToBuild(rm))
                         console.log("..2 NoManToRepair:" + c_NoManToRepair(rm))
