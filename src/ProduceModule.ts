@@ -71,7 +71,7 @@ function Process_ProduceWork() {
                     }
 
                     SpawnHelper.CreateCreep(spawn, "MMWC", Roler.Worker);
-                    rm.UpdateSpawnRelateds();
+                    break;
                 }
             }
         }

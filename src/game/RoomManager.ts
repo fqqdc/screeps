@@ -19,28 +19,21 @@ export default class RoomManager {
         this.data = data;
     }
 
-    private updateRoomData(value: { Task: Task, TaskTargetID: string }) {
-        switch (value.Task) {
+    private updateRoomObject(task: Task, id: string) {
+        switch (task) {
             case Task.Harvest:
-                const source = Game.getObjectById<Source>(value.TaskTargetID);
-                if (source) this.data.updateCanHarvestSources(source);
+                this.data.updateSourceById(id);
                 break;
             case Task.Transfer:
             case Task.Repair:
             case Task.Withdraw:
-                const struct = Game.getObjectById<AnyStructure>(value.TaskTargetID);
-                if (struct) this.data.updateStructure(struct);
-                else this.data.removeNotExistStructure(value.TaskTargetID);
+                this.data.updateStructureById(id);
                 break;
             case Task.Pickup:
-                const res = Game.getObjectById<Resource>(value.TaskTargetID);
-                if (res) this.data.updataResource(res);
-                else this.data.removeResource(value.TaskTargetID)
+                this.data.updateResourceById(id);
                 break;
             case Task.Build:
-                const site = Game.getObjectById<ConstructionSite>(value.TaskTargetID)
-                if (site) this.data.updateConstructionSite(site);
-                else this.data.removeConstructionSite(value.TaskTargetID);
+                this.data.updateConstructionSiteById(id);
                 break;
         }
     }
@@ -49,30 +42,20 @@ export default class RoomManager {
         //console.log(creep.name + " SetTask " + Task[task] + ":" + target)
 
         const creepMemory = creep.memory as CreepMemoryExt;
-        const oldValue = { Task: creepMemory.Task, TaskTargetID: creepMemory.TaskTargetID };
+        const oldValue = { task: creepMemory.Task, id: creepMemory.TaskTargetID };
 
         this.data.removeCreepFromCounter(creep.id);
-
         creepMemory.Task = task;
         if (task == Task.Idle) {
             delete creepMemory.TaskTargetID;
         } else {
             creepMemory.TaskTargetID = (target as TaskTarget).id;
         }
+        this.data.addCreepToCounter(creep.id);
 
-        this.data.addCreepToCounter(creep);
-        this.data.updateCreep(creep);
-
-        this.updateRoomData(oldValue);
-        this.updateRoomData({ Task: creepMemory.Task, TaskTargetID: creepMemory.TaskTargetID });
-    }
-
-    NotUpgradeControllerTask(): Boolean {
-        const set = this.data.taskCounter[Task.UpgradeController];
-        if (set) {
-            return set.size == 0;
-        }
-        return true;
+        this.data.updateCreepById(creep.id);
+        this.updateRoomObject(oldValue.task, oldValue.id);
+        this.updateRoomObject(creepMemory.Task, creepMemory.TaskTargetID);
     }
 
     CalcTask(task: Task): Number {
@@ -119,12 +102,5 @@ export default class RoomManager {
 
     GetCanPickupResources(): Resource[] {
         return GetGameObjects<Resource>(this.data.canPickupResources.values());
-    }
-
-    UpdateSpawnRelateds() {
-        this.data.structures.forEach(id => {
-            const struct = Game.getObjectById<AnyStructure>(id);
-            if (struct) this.data.updateStructure(struct);
-        });
     }
 }

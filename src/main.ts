@@ -25,7 +25,10 @@ export const loop = ErrorMapper.wrapLoop(() => {
     let counter: { [key: string]: number } = {};
     for (const name in Game.creeps) {
         const creep = Game.creeps[name];
-        if (creep.spawning && !creep.my) continue;
+        if (creep.spawning && !creep.my) {
+            console.log(creep.name);
+            continue;
+        }
 
         const memory = creep.memory as CreepMemoryExt
         const task = memory.Task;
@@ -45,6 +48,6 @@ export const loop = ErrorMapper.wrapLoop(() => {
     }
 
     debug.dlog("counterString", counterString);
-    if (Memory.debug)
+    //if (Memory.debug)
         RawMemory.segments[1] = JSON.stringify(Memory);
 });

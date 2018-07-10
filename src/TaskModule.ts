@@ -5,6 +5,7 @@ import { CreepHelper } from "helper/CreepHelper";
 import { SourceHelper } from "helper/SourceHelper";
 import { StructureHelper } from "helper/StructureHelper";
 import { SiteHelper } from "helper/SiteHelper";
+import RoomManager from "game/RoomManager";
 
 type TaskProcess = { (room: Room): Boolean }
 
@@ -176,7 +177,7 @@ function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
-    if (!rm.NotUpgradeControllerTask()) return true;
+    if (rm.CalcTask(Task.UpgradeController) > 0) return true;
 
     const controller = room.controller as StructureController;
     const creep = GetClosestObject(controller.pos, rm.GetIdleNotEmptyCreeps());
@@ -278,7 +279,9 @@ function TaskProcess_WithdrawEnergy(room: Room): Boolean {
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleEmptyCreeps().length == 0) return false;
-    if (rm.GetConstructionSites().length == 0 && rm.GetBrokenStructures().length == 0) return true;
+    if (rm.CalcTask(Task.UpgradeController) == 0
+        || (rm.GetConstructionSites().length == 0 && rm.GetBrokenStructures().length == 0)
+    ) return true;
     if (rm.GetNoEmptyStorages().length == 0) return true;
 
     const creeps = rm.GetIdleEmptyCreeps();

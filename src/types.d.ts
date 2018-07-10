@@ -6,4 +6,5 @@ declare const require: (module: string) => any;
 type HashTable<T> = { [id: string]: T }
 type StructureSpawnRelated = StructureExtension | StructureSpawn;
 type StructureStoreable = StructureContainer | StructureStorage;
-type TaskTarget = Source | AnyStructure | ConstructionSite | Resource ;
+type TaskTarget = Source | AnyStructure | ConstructionSite | Resource;
+type HasId = { "id":string }
