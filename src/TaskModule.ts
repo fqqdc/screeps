@@ -76,7 +76,7 @@ function Check_BuildTask(creep: Creep) {
 
     if (site == null
         || CreepHelper.IsCreepEmptyEnergy(creep)
-        || SiteHelper.IsConstructionSite(site)) {
+        || !SiteHelper.IsConstructionSite(site)) {
         rm.SetTask(creep, Task.Idle);
     }
 }
@@ -282,20 +282,20 @@ function TaskProcess_WithdrawEnergy(room: Room): Boolean {
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleEmptyCreeps().length == 0) return false;
-    if (rm.CalcTask(Task.UpgradeController) == 0
+    if (rm.CalcTask(Task.UpgradeController) != 0
         || (rm.GetConstructionSites().length == 0 && rm.GetBrokenStructures().length == 0)
     ) return true;
     if (rm.GetNoEmptyStorages().length == 0) return true;
 
     const creeps = rm.GetIdleEmptyCreeps();
-    do {
+    //do {
         const creep = creeps.shift() as Creep;
         const storage = GetClosestObject(creep.pos, rm.GetNoEmptyStorages());
 
         rm.SetTask(creep, Task.Withdraw, storage);
-        if (rm.GetNoEmptyStorages().length == 0) break;
+        //if (rm.GetNoEmptyStorages().length == 0) break;
 
-    } while (creeps.length > 0);
+    //} while (creeps.length > 0);
 
     return creeps.length > 0;
 }
@@ -308,12 +308,12 @@ function TaskProcess_Build(room: Room): Boolean {
     if (rm.GetConstructionSites().length == 0) return true;
 
     const creeps = rm.GetIdleHasEnergyCreeps();
-    do {
+    //do {
         const creep = creeps.shift() as Creep;
         const site = GetClosestObject(creep.pos, rm.GetConstructionSites());
         rm.SetTask(creep, Task.Build, site);
 
-    } while (creeps.length > 0)
+    //} while (creeps.length > 0)
 
     return creeps.length > 0;
 }
@@ -346,15 +346,15 @@ function TaskProcess_Repair(room: Room): Boolean {
     if (rm.GetBrokenStructures().length == 0) return true;
 
     const creeps = rm.GetIdleHasEnergyCreeps();
-    do {
+    //do {
         const creep = creeps.shift() as Creep;
         const broken = GetClosestObject(creep.pos, rm.GetBrokenStructures());
 
         rm.SetTask(creep, Task.Repair, broken);
-        if (rm.GetBrokenStructures().length == 0) break;
+        //if (rm.GetBrokenStructures().length == 0) break;
 
 
-    } while (creeps.length > 0);
+    //} while (creeps.length > 0);
 
     return creeps.length > 0;
 }

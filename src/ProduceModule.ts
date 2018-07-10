@@ -11,8 +11,9 @@ export default class ProduceModule {
     }
 }
 
-function c_NoIdleEmptyCreeps(rm: RoomManager) {
-    return rm.GetIdleEmptyCreeps().length != 0;
+function c_NoEmptyCreeps(rm: RoomManager) {
+    return rm.GetIdleEmptyCreeps().length != 0
+        && rm.GetIdleNotEmptyCreeps().length != 0;
 }
 
 function c_HasCanPickupResources(rm: RoomManager) {
@@ -20,7 +21,9 @@ function c_HasCanPickupResources(rm: RoomManager) {
 }
 
 function c_HasCanHarvestSources(rm: RoomManager) {
-    return rm.GetCanHarvestSources().length != 0;
+    return rm.GetCanHarvestSources().length != 0
+        && rm.CalcTask(Task.Build) == 0
+        && rm.CalcTask(Task.Repair) == 0;
 }
 
 function c_HasFullBase(rm: RoomManager) {
@@ -50,7 +53,7 @@ function Process_ProduceWork() {
         const room = Game.rooms[name];
         const rm = WorldManager.Entity.QueryRoom(room);
 
-        if (c_NoIdleEmptyCreeps(rm)) continue;
+        if (c_NoEmptyCreeps(rm)) continue;
 
         const spawns = room.find(FIND_MY_SPAWNS);
         for (const spawn of spawns) {

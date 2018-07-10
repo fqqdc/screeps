@@ -47,12 +47,10 @@ export function GetGameObjects<T>(ids: IterableIterator<string>): T[] {
 }
 
 export const ClearCreepMemory = function () {
-    if (Game.time % 1000 == 0) {
-        for (var name in Memory.creeps) {
-            if (!Game.creeps[name]) {
-                delete Memory.creeps[name];
-                console.log('Clearing non-existing creep memory:', name);
-            }
+    for (var name in Memory.creeps) {
+        if (!Game.creeps[name]) {
+            delete Memory.creeps[name];
+            console.log('Clearing non-existing creep memory:', name);
         }
     }
 }

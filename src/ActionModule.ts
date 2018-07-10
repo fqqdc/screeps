@@ -108,7 +108,15 @@ export class IdleAction extends BaseAction {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' IdleAction');
-        creep.move(((Math.random() * 100 % 8) + 1) as DirectionConstant);
+        if (creep.fatigue == 0) {
+            let x = creep.pos.x, y = creep.pos.y;
+            let dx, dy;
+            do {
+                dx = Number.parseInt((Math.random() * 100).toString()) % 3 - 1;
+                dy = Number.parseInt((Math.random() * 100).toString()) % 3 - 1;
+            } while (x + dx <= 0 || x + dx >= 49 || y + dy <= 0 || y + dy >= 49);
+            creep.moveTo(x + dy, y + dy);
+        }
     }
 }
 
