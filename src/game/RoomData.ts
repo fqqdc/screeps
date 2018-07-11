@@ -7,28 +7,28 @@ import StructureData from "./StructureData";
 
 export default class RoomData {
     name: string;
-    taskCounter: { [id: string]: Set<string> };
-    taskTargetCounter: { [id: string]: { [task: string]: Set<string> } };
+    taskCounter: { [id: string]: Set<string> } = {};
+    taskTargetCounter: { [id: string]: { [task: string]: Set<string> } } = {};
 
-    creeps: HashTable<string>;
-    idleEmptyCreeps: Set<string>;
-    idleHasEnergyCreeps: Set<string>;
-    idleNotEmptyCreeps: Set<string>;
+    creeps: HashTable<string> = {};
+    idleEmptyCreeps: Set<string> = new Set();
+    idleHasEnergyCreeps: Set<string> = new Set();
+    idleNotEmptyCreeps: Set<string> = new Set();
 
-    constructionSites: Set<string>;
+    constructionSites: Set<string> = new Set();
 
-    noFullSpawnRelateds: Set<string>;
-    noFullTowers: Set<string>;
-    noFullStorages: Set<string>;
-    noEmptyStorages: Set<string>;
-    brokenStructures: Set<string>;
-    structures: Set<string>;
+    noFullSpawnRelateds: Set<string> = new Set();
+    noFullTowers: Set<string> = new Set();
+    noFullStorages: Set<string> = new Set();
+    noEmptyStorages: Set<string> = new Set();
+    brokenStructures: Set<string> = new Set();
+    structures: Set<string> = new Set();
 
-    sources: HashTable<SourceData>;
-    canHarvestSources: Set<string>;
+    sources: HashTable<SourceData> = {};
+    canHarvestSources: Set<string> = new Set();
 
-    resources: Set<string>;
-    canPickupResources: Set<string>;
+    resources: Set<string> = new Set();
+    canPickupResources: Set<string> = new Set();
 
     constructor(room: Room) {
         if (room == null)
@@ -36,31 +36,10 @@ export default class RoomData {
 
         this.name = room.name;
 
-        this.creeps = {}
-        this.idleEmptyCreeps = new Set();
-        this.idleHasEnergyCreeps = new Set();
-        this.idleNotEmptyCreeps = new Set();
-        this.taskCounter = {};
-        this.taskTargetCounter = {};
         this.initCreeps(room);
-
-        this.noFullSpawnRelateds = new Set();
-        this.noFullTowers = new Set();
-        this.noFullStorages = new Set();
-        this.noEmptyStorages = new Set();
-        this.brokenStructures = new Set();
-        this.structures = new Set();
         this.initStructures(room);
-
-        this.sources = {};
-        this.canHarvestSources = new Set();
         this.initSources(room);
-
-        this.constructionSites = new Set();
         this.initConstructionSites(room);
-
-        this.resources = new Set();
-        this.canPickupResources = new Set();
         this.initResources(room);
     }
 
