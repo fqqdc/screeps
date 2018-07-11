@@ -188,7 +188,7 @@ export default class RoomData {
         const name = this.creeps[creepId];
         console.log('Clearing non-existing creep memory:', name);
         delete this.creeps[creepId];
-        delete Game.creeps[name];
+        delete Memory.creeps[name];
 
     }
 
