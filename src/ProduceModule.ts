@@ -1,4 +1,4 @@
-import { CreepMemoryExt } from "helper";
+import { CreepMemoryExt, MemoryExt, RoomMemoryExt, GetClosestObjectByRange } from "helper";
 import { Roler, Task } from "Constant";
 import { SpawnHelper } from "helper/SpawnHelper";
 import WorldManager from "game/WorldManager";
@@ -8,16 +8,19 @@ export default class ProduceModule {
     Run() {
         Process_ProduceWork();
         Process_TowerWork();
+        Process_SetConstructionSite()
     }
 }
 
 function c_NoEmptyCreeps(rm: RoomManager) {
     return rm.GetIdleEmptyCreeps().length != 0
-        && rm.GetIdleNotEmptyCreeps().length != 0;
+        || rm.GetIdleNotEmptyCreeps().length != 0;
 }
 
 function c_HasCanPickupResources(rm: RoomManager) {
-    return rm.GetCanPickupResources().length != 0;
+    return rm.GetCanPickupResources().length != 0
+        && rm.CalcTask(Task.Build) == 0
+        && rm.CalcTask(Task.Repair) == 0;
 }
 
 function c_HasCanHarvestSources(rm: RoomManager) {
@@ -99,7 +102,7 @@ function Process_TowerWork() {
 
             let tower = structure as StructureTower;
             const rm = WorldManager.Entity.QueryRoom(tower.room);
-            var closestHostile = tower.pos.findClosestByRange(FIND_HOSTILE_CREEPS);
+            const closestHostile = tower.pos.findClosestByRange(FIND_HOSTILE_CREEPS);
             if (closestHostile != null) {
                 tower.attack(closestHostile);
             }
@@ -107,15 +110,42 @@ function Process_TowerWork() {
             if (tower.energy < tower.energyCapacity * 0.5)
                 return;
 
-            var closestDamagedStructure = tower.pos.findClosestByRange(FIND_STRUCTURES, {
-                filter: (structure) => structure.hits < structure.hitsMax * 0.5
-                    && rm.CalcTask(Task.Repair) == 0
-            });
-
+            if (rm.CalcTask(Task.Repair) != 0) return;
+            const closestDamagedStructure = GetClosestObjectByRange(tower.pos, rm.GetBrokenStructures());
             if (closestDamagedStructure) {
                 tower.repair(closestDamagedStructure);
             }
         }
     }
+}
 
+function Process_SetConstructionSite() {
+    for (const name in Game.rooms) {
+        const room = Game.rooms[name];
+        const rm = WorldManager.Entity.QueryRoom(room);
+
+        if (rm.GetConstructionSites().length != 0) return;
+        if (rm.GetIdleHasEnergyCreeps().length == 0) return;
+
+        const mem = room.memory as RoomMemoryExt;
+        if (!mem.trace || Object.keys(mem.trace).length == 0) return;
+
+        const trace = Object.entries(mem.trace);
+        const sorted = trace.sort((a, b) => a["1"] - b["1"]);
+        const last = sorted.pop() as [string, number];
+
+        if (last["1"] > 15) {
+            const x = Number.parseInt(last["0"]) % 50;
+            const y = (Number.parseInt(last["0"]) - x) / 50;
+
+            console.log(`last ${last["0"]}:${last["1"]}`);
+            console.log(`(${x},${y}) need road`);
+
+            const pos = new RoomPosition(x, y, name);
+            console.log(pos);
+            const r = pos.createConstructionSite(STRUCTURE_ROAD);
+            if (r == OK) delete mem.trace[last["0"]];
+            else console.log("create site error:" + r)
+        }
+    }
 }

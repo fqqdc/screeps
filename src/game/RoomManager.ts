@@ -58,7 +58,7 @@ export default class RoomManager {
         this.updateRoomObject(creepMemory.Task, creepMemory.TaskTargetID);
     }
 
-    CalcTask(task: Task): Number {
+    CalcTask(task: Task): number {
         const set = this.data.taskCounter[task];
         if (set) return set.size;
         return 0;

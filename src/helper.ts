@@ -55,3 +55,43 @@ export const ClearCreepMemory = function () {
     }
 }
 
+export function randomInt(max: number) {
+    return Math.floor((Math.random() * max * 100)) % max;
+}
+
+export function GetClosestObjectByPath<T extends _HasRoomPosition>(from: RoomPosition, arr: T[]): T {
+    let best: T | undefined;
+    let bestPL: Number = Number.MAX_VALUE;
+
+    for (const obj of arr) {
+        const pathLength = from.findPathTo(obj).length;
+        if (best == undefined) {
+            best = obj;
+            bestPL = pathLength;
+        } else if (pathLength < bestPL) {
+            best = obj;
+            bestPL = pathLength;
+        }
+    }
+
+    return best as T;
+}
+
+export function GetClosestObjectByRange<T extends _HasRoomPosition>(from: RoomPosition, arr: T[]): T {
+    let best: T | undefined;
+    let bestPL: Number = Number.MAX_VALUE;
+
+    for (const obj of arr) {
+        const pathLength = from.getRangeTo(obj);
+        if (best == undefined) {
+            best = obj;
+            bestPL = pathLength;
+        } else if (pathLength < bestPL) {
+            best = obj;
+            bestPL = pathLength;
+        }
+    }
+
+    return best as T;
+}
+

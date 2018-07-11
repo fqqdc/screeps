@@ -24,8 +24,7 @@ export const loop = ErrorMapper.wrapLoop(() => {
     let counter: { [key: string]: number } = {};
     for (const name in Game.creeps) {
         const creep = Game.creeps[name];
-        if (creep.spawning && !creep.my) {
-            console.log(creep.name);
+        if (creep.spawning || !creep.my) {
             continue;
         }
 
@@ -39,14 +38,26 @@ export const loop = ErrorMapper.wrapLoop(() => {
         }
     }
 
-    let counterString = "";
+
     const keys = Object.keys(counter).sort();
+
+    if (Memory.ui) {
+        const ui = Game.flags['UI'];
+        if (ui) {
+            let pos = ui.pos;
+            for (let i = 0; i < keys.length; i++) {
+                new RoomVisual().text(keys[i] + ":" + counter[keys[i]], pos.x + 1, pos.y + i + 1, { align: 'left' })
+            }
+        }
+    }
+
+    let counterString = "";
     for (let i = 0; i < keys.length; i++) {
         const n = keys[i];
         counterString = counterString.concat(n + ':' + counter[n] + '|');
     }
-
     debug.dlog("counterString", counterString);
+
     //if (Memory.debug)
-        RawMemory.segments[1] = JSON.stringify(Memory);
+    RawMemory.segments[1] = JSON.stringify(Memory);
 });

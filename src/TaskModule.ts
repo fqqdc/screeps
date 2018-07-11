@@ -1,6 +1,6 @@
 import { Task } from "Constant";
 import WorldManager from "game/WorldManager";
-import { CreepMemoryExt } from "helper";
+import { CreepMemoryExt, randomInt } from "helper";
 import { CreepHelper } from "helper/CreepHelper";
 import { SourceHelper } from "helper/SourceHelper";
 import { StructureHelper } from "helper/StructureHelper";
@@ -38,7 +38,7 @@ export default class TaskModule {
         seq.push(TaskProcess_Build); //7
         seq.push(TaskProcess_Repair); //8
         seq.push(TaskProcess_FillStorages); //9
-        //seq.push(TaskProcess_UpgradeController); //10
+        seq.push(TaskProcess_UpgradeController); //10
 
         return seq;
     }
@@ -176,11 +176,11 @@ function GetClosestObject<T extends _HasRoomPosition>(from: RoomPosition, arr: T
 }
 
 function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_MinimumUpgradeController:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.CalcTask(Task.UpgradeController) > 0) return true;
+    if (Memory.debug) console.log('TaskProcess_MinimumUpgradeController:' + room.name); // DEBUG
 
     const controller = room.controller as StructureController;
     const creep = GetClosestObject(controller.pos, rm.GetIdleHasEnergyCreeps());
@@ -190,11 +190,11 @@ function TaskProcess_MinimumUpgradeController(room: Room): Boolean {
 }
 
 function TaskProcess_Pickup(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_Pickup:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleEmptyCreeps().length == 0) return false;
     if (rm.GetCanPickupResources().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_Pickup:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleEmptyCreeps();
     let resources = rm.GetCanPickupResources();
@@ -213,11 +213,11 @@ function TaskProcess_Pickup(room: Room): Boolean {
 }
 
 function TaskProcess_Harvest(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_Harvest:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleEmptyCreeps().length == 0) return false;
     if (rm.GetCanHarvestSources().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_Harvest:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleEmptyCreeps();
     let sources = rm.GetCanHarvestSources();
@@ -236,11 +236,11 @@ function TaskProcess_Harvest(room: Room): Boolean {
 }
 
 function TaskProcess_FillBase(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_FillBase:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetNoFullSpawnRelateds().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_FillBase:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleHasEnergyCreeps();
     do {
@@ -257,11 +257,11 @@ function TaskProcess_FillBase(room: Room): Boolean {
 }
 
 function TaskProcess_FillTower(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_FillTower:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetNoFullTowers().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_FillTower:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleHasEnergyCreeps();
     do {
@@ -278,14 +278,15 @@ function TaskProcess_FillTower(room: Room): Boolean {
 }
 
 function TaskProcess_WithdrawEnergy(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_WithdrawEnergy:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleEmptyCreeps().length == 0) return false;
     if (rm.CalcTask(Task.UpgradeController) != 0
         || (rm.GetConstructionSites().length == 0 && rm.GetBrokenStructures().length == 0)
     ) return true;
+    if (rm.CalcTask(Task.Withdraw) != 0) return true;
     if (rm.GetNoEmptyStorages().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_WithdrawEnergy:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleEmptyCreeps();
     //do {
@@ -301,11 +302,11 @@ function TaskProcess_WithdrawEnergy(room: Room): Boolean {
 }
 
 function TaskProcess_Build(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_Build:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetConstructionSites().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_Build:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleHasEnergyCreeps();
     //do {
@@ -319,11 +320,11 @@ function TaskProcess_Build(room: Room): Boolean {
 }
 
 function TaskProcess_FillStorages(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_FillStorages:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleNotEmptyCreeps().length == 0) return false;
     if (rm.GetNoFullStorages().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_FillStorages:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleNotEmptyCreeps();
     do {
@@ -339,11 +340,11 @@ function TaskProcess_FillStorages(room: Room): Boolean {
 }
 
 function TaskProcess_Repair(room: Room): Boolean {
-    if (Memory.debug) console.log('TaskProcess_Repair:' + room.name); // DEBUG
     const rm = WorldManager.Entity.QueryRoom(room);
 
     if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
     if (rm.GetBrokenStructures().length == 0) return true;
+    if (Memory.debug) console.log('TaskProcess_Repair:' + room.name); // DEBUG
 
     const creeps = rm.GetIdleHasEnergyCreeps();
     //do {
@@ -357,4 +358,19 @@ function TaskProcess_Repair(room: Room): Boolean {
     //} while (creeps.length > 0);
 
     return creeps.length > 0;
+}
+
+function TaskProcess_UpgradeController(room: Room): Boolean {
+    const rm = WorldManager.Entity.QueryRoom(room);
+    const c = room.controller;
+
+    if (rm.GetIdleHasEnergyCreeps().length == 0) return false;
+    //if ((!c) || rm.CalcTask(Task.UpgradeController) >= c.level) return true;
+    if (!(c) || randomInt(100) >= 10) return true;
+    if (Memory.debug) console.log('TaskProcess_UpgradeController:' + room.name); // DEBUG
+
+    const creep = GetClosestObject(c.pos, rm.GetIdleHasEnergyCreeps());
+    rm.SetTask(creep, Task.UpgradeController, c);
+
+    return rm.CalcTask(Task.UpgradeController) >= c.level;
 }

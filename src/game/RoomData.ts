@@ -100,7 +100,8 @@ export default class RoomData {
     // Structure
     private groupingStructure(structure: AnyStructure) {
         const sumRepair = this.countTaskAmount(structure, Task.Pickup);
-        if (structure.hitsMax * 0.85 > structure.hits + sumRepair) {
+        if (structure.hitsMax * 0.85 > structure.hits + sumRepair
+            && structure.structureType != STRUCTURE_WALL) {
             this.brokenStructures.add(structure.id);
         } else {
             this.brokenStructures.delete(structure.id);

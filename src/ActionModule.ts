@@ -1,4 +1,4 @@
-import { CreepMemoryExt, RoomMemoryExt } from "helper";
+import { CreepMemoryExt, RoomMemoryExt, randomInt } from "helper";
 import { Task } from "Constant"
 
 export default class ActionModule {
@@ -68,16 +68,29 @@ export abstract class BaseAction {
     MoveTo(to: RoomPosition, opts?: MoveToOpts) {
         if (this.creep.fatigue == 0) {
             this.creep.moveTo(to, opts);
-        }
-        else {
+        } else {
             const room = Game.rooms[to.roomName];
             if (room) {
                 const mem = room.memory as RoomMemoryExt;
                 if (!mem.trace) mem.trace = {};
+                const nMove = this.creep.getActiveBodyparts(MOVE);
+                if (nMove == 0) return;
+
                 const pos = this.creep.pos;
+                const sites = pos.lookFor(LOOK_CONSTRUCTION_SITES);
+                for (const s of sites) {
+                    if (s.structureType == STRUCTURE_ROAD) return;
+                }
+
+                const structs = pos.lookFor(LOOK_STRUCTURES);
+                for (const s of structs) {
+                    if (s.structureType == STRUCTURE_ROAD) return;
+                }
+
                 const index = pos.y * 50 + pos.x;
-                if (mem.trace[index]) mem.trace[index] += 1;
-                else mem.trace[index] = 1;
+                if (mem.trace[index])
+                    mem.trace[index] += this.creep.fatigue / nMove;
+                else mem.trace[index] = this.creep.fatigue / nMove;
             }
         }
     }
@@ -104,18 +117,50 @@ export class IdleAction extends BaseAction {
         super(creep);
     }
 
+    hasRoad(pos: RoomPosition) {
+        const structs = pos.lookFor(LOOK_STRUCTURES);
+        for (const s of structs) {
+            if (s.structureType == STRUCTURE_ROAD) return true;
+        }
+        return false;
+    }
+
     Run() {
         const creep = this.creep;
         const memory = creep.memory as CreepMemoryExt
         if (memory.debug) console.log(creep.name + ' IdleAction');
+
         if (creep.fatigue == 0) {
-            let x = creep.pos.x, y = creep.pos.y;
-            let dx, dy;
-            do {
-                dx = Number.parseInt((Math.random() * 100).toString()) % 3 - 1;
-                dy = Number.parseInt((Math.random() * 100).toString()) % 3 - 1;
-            } while (x + dx <= 0 || x + dx >= 49 || y + dy <= 0 || y + dy >= 49);
-            creep.moveTo(x + dy, y + dy);
+            const x = creep.pos.x, y = creep.pos.y, name = creep.room.name;
+            const swamp: RoomPosition[] = [];
+            const road: RoomPosition[] = [];
+
+            for (let dx = -1; dx <= 1; dx++)
+                for (let dy = -1; dy <= 1; dy++) {
+                    const t = (Game.map.getTerrainAt(x + dx, y + dy, name));
+                    if (x + dx <= 0 || x + dx >= 49 || y + dy <= 0 || y + dy >= 49)
+                        continue;
+                    switch (t) {
+                        case "plain":
+                            road.push(new RoomPosition(x + dx, y + dy, name)); break;
+                        case "swamp":
+                            swamp.push(new RoomPosition(x + dx, y + dy, name)); break;
+                        default:
+                            continue;
+                    }
+                }
+            let toPos: RoomPosition | undefined;
+            for (const p of swamp) {
+                if (this.hasRoad(p))
+                    road.push(p);
+            }
+
+            if (road.length == 0) {
+                if (swamp.length == 0) { }
+                else { toPos = swamp[randomInt(swamp.length)]; }
+            } else { toPos = road[randomInt(road.length)]; }
+
+            if (toPos) creep.moveTo(toPos);
         }
     }
 }
