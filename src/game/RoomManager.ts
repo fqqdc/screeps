@@ -1,7 +1,7 @@
 import { CreepMemoryExt, GetGameObjects } from "helper";
 import { Task } from "Constant";
-import RoomData from "./RoomData";
 import { SourceHelper } from "helper/SourceHelper";
+import RoomData from "game/RoomData";
 
 export default class RoomManager {
     private static entitys: { [name: string]: RoomManager };

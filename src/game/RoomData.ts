@@ -2,7 +2,6 @@ import { MemoryExt, CreepMemoryExt, GetGameObjects, debug } from "helper";
 import { SourceHelper } from "helper/SourceHelper";
 import { Task } from "Constant";
 import SourceData from "./SourceData";
-import GameSet from "helper/Set";
 import StructureData from "./StructureData";
 
 export default class RoomData {

@@ -1,6 +1,6 @@
 import { CreepMemoryExt, AutomaticTaskTarget } from "helper";
 import { Task } from "Constant";
-import { BaseAction, TransferAction, HarvestAction, IdleAction } from "ActionModule";
+import { BaseAction, TransferAction, HarvestAction, IdleAction } from "action/BaseAction";
 import RoomManager from "game/RoomManager";
 import WorldManager from "game/WorldManager";
 
@@ -15,7 +15,7 @@ export abstract class Automatic extends BaseAction {
     }
 
     abstract init(): void;
-    abstract SwitchTask():void;
+    abstract SwitchTask(): void;
 
 
     Run() {
@@ -24,9 +24,9 @@ export abstract class Automatic extends BaseAction {
 
         switch (this.memory.AutoTask) {
             case Task.Harvest:
-                new HarvestAction(this.creep, this.AutoTask).Run(); break;
+                new HarvestAction(this.creep, this.AutoTaskTarget.TargetID).Run(); break;
             case Task.Transfer:
-                new TransferAction(this.creep, this.AutoTask).Run(); break;
+                new TransferAction(this.creep, this.AutoTaskTarget.TargetID).Run(); break;
             case Task.Idle:
                 new IdleAction(this.creep);
         }
@@ -84,7 +84,6 @@ export abstract class Automatic extends BaseAction {
                 const source = object as Source;
                 return source.energy == 0 && source.ticksToRegeneration < 15;
             }
-
         }
 
         return true;
@@ -146,72 +145,71 @@ export class HarvsetAutomatic extends Automatic {
         return target;
     }
 
+    private SwitchToTransfer(): boolean {
+        const target = this.GetClosestTransferTarget();
+        if (target) {
+            this.AutoTaskTarget.TargetID = target.id;
+            this.AutoTask = Task.Transfer;
+            return true;
+        }
+        return false;
+    }
+
+    private SwitchToHarvest(): boolean {
+        const target = this.GetClosestHarvestTarget();
+        if (target) {
+            this.AutoTaskTarget.TargetID = target.id;
+            this.AutoTask = Task.Harvest;
+            return true;
+        }
+        return false;
+    }
+
+    private SwitchToIdle(): boolean {
+        this.AutoTask = Task.Idle;
+        return true;
+    }
+
     init(): void {
-
-
         if (this.IsFull()) {
-            const target = this.GetClosestTransferTarget();
-            if (target) {
-                this.AutoTaskTarget.TargetID = target.id;
-                this.AutoTask = Task.Transfer;
-            }
-            else this.AutoTask = Task.Idle;
-
+            if (!this.SwitchToTransfer())
+                this.SwitchToIdle();
         } else {
-            const target = this.GetClosestHarvestTarget();
-            if (target) {
-                this.AutoTaskTarget.TargetID = target.id;
-                this.AutoTask = Task.Harvest;
-            }
-            this.AutoTask = Task.Idle;
+            if (!this.SwitchToHarvest())
+                this.SwitchToIdle();
         }
     }
 
-    SwitchTask():void {
+    SwitchTask(): void {
         switch (this.memory.AutoTask) {
             case Task.Transfer:
                 if (this.IsEmpty()) {
-                    const target = this.GetClosestHarvestTarget();
-                    if (target) {
-                        this.AutoTaskTarget.TargetID = target.id;
-                        this.AutoTask = Task.Harvest;
-                    } else this.AutoTask = Task.Idle;
+                    if (!this.SwitchToHarvest())
+                        this.SwitchToIdle();
                 } else {
                     if (this.IsFullTarget(this.AutoTaskTarget.TargetID)) {
-                        const target = this.GetClosestTransferTarget();
-                        if (target) this.AutoTaskTarget.TargetID = target.id;
-                        else this.AutoTask = Task.Idle;
+                        if (!this.SwitchToTransfer())
+                            this.SwitchToIdle();
                     }
                 }
                 break;
             case Task.Harvest:
-                if (this.IsFull()) {
-                    const target = this.GetClosestTransferTarget();
-                    if (target) this.AutoTaskTarget.TargetID = target.id;
-                    else this.AutoTask = Task.Idle;
-                } else {
-                    if (this.IsEmptyEnergyTarget(this.AutoTaskTarget.TargetID)) {
-                        const target = this.GetClosestHarvestTarget();
-                        if (target) this.AutoTaskTarget.TargetID = target.id;
-                        else this.AutoTask = Task.Idle;
-                    }
-                }
+                if (this.IsFull()
+                    || this.IsEmptyEnergyTarget(this.AutoTaskTarget.TargetID)) {
+                    if (!this.SwitchToTransfer())
+                        this.SwitchToIdle();
+                } 
                 break;
             case Task.Idle:
-                if (this.IsEmpty()) {
-                    const target = this.GetClosestHarvestTarget();
-                    if (target) {
-                        this.AutoTaskTarget.TargetID = target.id;
-                        this.AutoTask = Task.Harvest;
-                    }
+                if (!this.IsFull()) {
+                    if (!this.SwitchToHarvest())
+                        if (!this.IsEmpty() && !this.SwitchToTransfer())
+                            this.SwitchToIdle();
                 } else {
-                    const target = this.GetClosestTransferTarget();
-                    if (target) {
-                        this.AutoTaskTarget.TargetID = target.id;
-                        this.AutoTask = Task.Transfer;
-                    }
+                    if (!this.SwitchToTransfer())
+                        this.SwitchToIdle();
                 }
-                break;            
+                break;
         }
     }
 }
