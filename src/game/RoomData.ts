@@ -208,8 +208,10 @@ export default class RoomData {
         this.idleHasEnergyCreeps.delete(creepId);
 
         const name = this.creeps[creepId];
+        console.log('Clearing non-existing creep memory:', name);
         delete this.creeps[creepId];
         delete Game.creeps[name];
+
     }
 
     private initCreep(creep: Creep) {
