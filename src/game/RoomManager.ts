@@ -2,6 +2,7 @@ import { CreepMemoryExt, GetGameObjects } from "helper";
 import { Task } from "Constant";
 import { SourceHelper } from "helper/SourceHelper";
 import RoomData from "game/RoomData";
+import { ResourceData } from "./Interfaces";
 
 export default class RoomManager {
     private static entitys: { [name: string]: RoomManager };
@@ -17,6 +18,7 @@ export default class RoomManager {
     private data: RoomData;
     private constructor(data: RoomData) {
         this.data = data;
+
     }
 
     private updateRoomObject(task: Task, id: string) {
@@ -63,6 +65,24 @@ export default class RoomManager {
         if (set) return set.size;
         return 0;
     }
+
+    get Controller(): StructureController {
+        throw "未实现";
+    }
+
+    get RoomName(): String {
+        return this.data.name;
+    }
+
+    get ResourcesData(): ResourceData[] {
+        throw "未实现";
+    }
+
+    GetCreepsFromTarget(target:RoomObject, task: Task): Creep[] {
+        throw "未实现";
+    }
+
+
 
     GetNoFullSpawnRelateds(): StructureSpawnRelated[] {
         return GetGameObjects<StructureSpawnRelated>(this.data.noFullSpawnRelateds.values());
