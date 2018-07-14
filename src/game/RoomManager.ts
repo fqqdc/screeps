@@ -2,7 +2,7 @@ import { CreepMemoryExt, GetGameObjects } from "helper";
 import { Task } from "Constant";
 import { SourceHelper } from "helper/SourceHelper";
 import RoomData from "game/RoomData";
-import { ResourceData } from "./Interfaces";
+import { ResourceData, SourceData } from "./Interfaces";
 
 export default class RoomManager {
     private static entitys: { [name: string]: RoomManager };
@@ -75,6 +75,10 @@ export default class RoomManager {
     }
 
     get ResourcesData(): ResourceData[] {
+        throw "未实现";
+    }
+
+    get SoucesData(): SourceData[] {
         throw "未实现";
     }
 
